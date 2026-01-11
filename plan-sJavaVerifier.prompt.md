@@ -8,13 +8,14 @@ The system follows a pipeline architecture:
 1. **File Reading** → 2. **Preprocessing** → 3. **Parsing & Scope Building** → 4. **Validation** → 5. **Output**
 
 ### Package Structure
-- `ex5.main` - Entry point (`Sjavac` class)
-- `ex5.preprocessor` - Line cleanup and normalization (`CodePreprocessor`)
-- `ex5.parser` - Parsing logic and scope tree construction (`CodeParser`)
+- `ex5.main` - Entry point (`Sjavac` class) + `InvalidFileException` (thrown by main)
+- `ex5.preprocessor` - Line cleanup (`CodePreprocessor`) + `PreprocessorException`
+- `ex5.parser` - Parsing logic (`CodeParser`) + `ParserException`
 - `ex5.models` - Data models (`Variable`, `VariableTable`, `Method`, `Statement`)
-- `ex5.scope` - Scope hierarchy (`Scope`, `GlobalScope`, `MethodScope`, `BlockScope`)
-- `ex5.validator` - Validation logic and `RegexManager` with static regex patterns
-- `ex5.exception` - Custom exception classes
+- `ex5.scope` - Scope hierarchy (`Scope`, `GlobalScope`, `MethodScope`, `BlockScope`) + `ScopeException`
+- `ex5.validator` - Validation logic and `RegexManager` + `VariableException`, `MethodException`, `ConditionException`
+
+**Note**: Per requirements section 6.1, each exception class must be in the SAME package as the class that throws it, NOT in a separate exceptions package. Exception classes should NOT be nested classes.
 
 ## Steps
 
@@ -31,8 +32,9 @@ The system follows a pipeline architecture:
 
 ### 2. Implement Models Package (`ex5.models`)
 - **`Variable` class**: 
-  - Attributes: `String name`, `String type`, `boolean isFinal`, `boolean isInitialized`, `int lineNumber`
+  - Attributes: `String name`, `String type`, `boolean isFinal`, `boolean isInitialized`, `int lineNumber`, `boolean isParameter`
   - Methods: getters, setters, `initialize()`, `canAssign()` (check if final)
+  - Note: Parameters are always considered initialized
 - **`VariableTable` class**: 
   - Internal: `HashMap<String, Variable>` to store variables
   - Methods:
@@ -56,6 +58,10 @@ The system follows a pipeline architecture:
   - Identifying empty lines (only whitespace) - track but preserve for line numbering
   - Trimming leading/trailing whitespace from code lines
   - Preserving original line numbers for error reporting
+  - **Note**: Do NOT normalize internal whitespace - validation must check for required spaces:
+    - Between `void` and method name (e.g., `voidfoo()` is illegal)
+    - Between `final` and type (e.g., `finalint` is illegal)
+    - Between type and variable name (e.g., `inta` is illegal)
 - Output: `List<ProcessedLine>` where `ProcessedLine` contains:
   - `int originalLineNumber`
   - `String cleanedContent`
@@ -68,9 +74,10 @@ The system follows a pipeline architecture:
 - Create `RegexManager` class with static final `Pattern` constants:
   - **Variable & Type Patterns**:
     - `TYPE_PATTERN` - Match valid types: `(int|double|boolean|char|String)`
-    - `IDENTIFIER` - Valid variable/method names: `[a-zA-Z]([a-zA-Z0-9_]*[a-zA-Z0-9])?|[a-zA-Z]|_[a-zA-Z0-9]([a-zA-Z0-9_]*[a-zA-Z0-9])?`
+    - `VARIABLE_NAME` - Valid variable names: `([a-zA-Z][a-zA-Z0-9_]*|_[a-zA-Z0-9][a-zA-Z0-9_]*)` (letter+any OR underscore+letter/digit+any, but NOT __, NOT starting with digit)
+    - `METHOD_NAME` - Valid method names: `[a-zA-Z][a-zA-Z0-9_]*` (MUST start with letter, not underscore)
     - `VARIABLE_DECLARATION` - Match: `(final\s+)?TYPE\s+IDENTIFIER(\s*=\s*VALUE)?(\s*,\s*IDENTIFIER(\s*=\s*VALUE)?)*\s*;`
-    - `VARIABLE_ASSIGNMENT` - Match: `IDENTIFIER(\s*,\s*IDENTIFIER)*\s*=\s*VALUE(\s*,\s*VALUE)*\s*;`
+    - `VARIABLE_ASSIGNMENT` - Match: `IDENTIFIER(\s*=\s*VALUE)(\s*,\s*IDENTIFIER\s*=\s*VALUE)*\s*;` (Note: each variable must have its own value)
   - **Value Patterns**:
     - `INT_VALUE` - `[+-]?\d+`
     - `DOUBLE_VALUE` - `[+-]?(\d+\.\d*|\d*\.\d+|\d+\.|\.\d+)`
@@ -167,16 +174,29 @@ The system follows a pipeline architecture:
 - **`GlobalValidator`**:
   - `validateGlobalVariables(GlobalScope)` - Check syntax, naming rules, no duplicates
   - `validateMethodSignatures(GlobalScope)` - Check naming, parameters, no duplicates/overloading
+    - Method names MUST start with a letter (not underscore or digit)
+    - Methods and variables CAN have the same name (this is allowed)
   - `validateNoMethodCallsInGlobal(GlobalScope)` - Ensure no method calls in global scope
 - **`VariableValidator`**:
   - `validateVariableName(String name)` - Check naming rules (no leading digit, no `__`, etc.)
   - `validateTypeCompatibility(String fromType, String toType)` - Check assignments (int→double, int/double→boolean allowed)
   - `validateInitializationBeforeUse(Scope, Statement)` - Check variable initialized before use in expressions
+    - **Critical Rule from 5.2.1**: Local variable not initialized at declaration can only be used if:
+      1. Next line where it appears is an assignment to it, OR
+      2. It is never used
+    - **Critical Rule from 5.2.3**: When inside a method:
+      - Global variables initialized anywhere in the method are considered initialized for rest of method
+      - Local variables initialized in nested scope are considered initialized in parent scope for subsequent lines
+      - You do NOT need to check if initialization is reachable (e.g., inside `if(false)` is OK)
   - `validateFinalVariable(Variable)` - Check final variables initialized at declaration, not reassigned
   - `validateScopeAccess(Scope, String varName)` - Verify variable accessible from current scope
+    - **Critical from 5.2.3**: You CANNOT access a variable defined in a more internal scope
+    - Can access: (1) local var in current or outer scope, (2) global var if in any method, (3) global var in global scope after definition line
 - **`MethodValidator`**:
   - `validateMethodCall(MethodScope, String methodName, List<String> args)` - Check method exists, arg count/types match
   - `validateReturnStatement(MethodScope)` - Verify return exists and is last statement (ignoring empty lines)
+    - **Critical**: Return must be last code statement (empty lines/whitespace after are OK)
+    - **Note**: You do NOT need to check for unreachable code after previous return statements
   - `validateParameters(Method)` - Check parameter syntax, types, names
   - `validateFinalParameters(MethodScope)` - Ensure final params not reassigned in method body
 - **`ControlFlowValidator`**:
@@ -194,24 +214,31 @@ The system follows a pipeline architecture:
   - On first error, throw appropriate exception and stop validation
   - Coordinate calls to specific validators
 
-### 8. Implement Exception Hierarchy (`ex5.exception`)
-- **Base `SJavaException extends Exception`**:
+### 8. Implement Exception Hierarchy (distributed across packages)
+**Important**: Per requirements 6.1, each exception must be in the same package as the class that throws it.
+
+- **Base `SJavaException extends Exception`** (in `ex5.main`):
   - Attributes: `String message`, `int lineNumber`
   - Constructor: `SJavaException(String message, int lineNumber)`
   - Method: `getFormattedMessage()` - Return "Error at line X: message"
-- **`InvalidFileException extends SJavaException`**:
-  - For file not found, wrong extension (.sjava), IO errors
+  
+- **`InvalidFileException extends SJavaException`** (in `ex5.main`, thrown by `Sjavac`):
+  - For file not found, wrong extension (.sjava), IO errors, illegal number of arguments
   - Exit code: 2
   - Constructor: `InvalidFileException(String message)` (no line number needed)
-- **`SyntaxException extends SJavaException`**:
+  
+- **`SyntaxException extends SJavaException`** (in `ex5.main`, base for code errors):
   - For syntax/semantic errors in s-Java code
   - Exit code: 1
   - Constructor: `SyntaxException(String message, int lineNumber)`
-- **Specific exceptions** (all extend `SyntaxException`):
-  - `VariableException` - Variable naming, initialization, scope, type errors
-  - `MethodException` - Method declaration, call, return errors
-  - `ScopeException` - Block structure, brace matching errors
-  - `ConditionException` - if/while condition errors
+  
+- **Package-specific exceptions** (all extend `SyntaxException`):
+  - `PreprocessorException` (in `ex5.preprocessor`) - Illegal comments detected
+  - `ParserException` (in `ex5.parser`) - Parsing errors, brace mismatches
+  - `ScopeException` (in `ex5.scope`) - Scope structure errors
+  - `VariableException` (in `ex5.validator`) - Variable naming, initialization, type errors
+  - `MethodException` (in `ex5.validator`) - Method declaration, call, return errors
+  - `ConditionException` (in `ex5.validator`) - if/while condition errors
 
 ### 9. Implement Main Entry Point (`ex5.main.Sjavac`)
 - **`main(String[] args)` method structure**:
@@ -273,13 +300,12 @@ The system follows a pipeline architecture:
       - RegexManager centralization: Benefits of static pattern constants
       - VariableTable per scope: How parent chain lookup works
     - **Module Responsibilities**:
-      - `ex5.main`: Program entry, coordination, exception handling
-      - `ex5.preprocessor`: Line cleaning, comment removal, illegal format detection
-      - `ex5.parser`: Scope tree construction, line type identification
+      - `ex5.main`: Program entry, coordination, base exception hierarchy (`SJavaException`, `InvalidFileException`, `SyntaxException`)
+      - `ex5.preprocessor`: Line cleaning, comment removal, illegal format detection + `PreprocessorException`
+      - `ex5.parser`: Scope tree construction, line type identification + `ParserException`
       - `ex5.models`: Data structures for variables, methods, statements
-      - `ex5.scope`: Scope hierarchy, variable lookup chain, tree structure
-      - `ex5.validator`: Validation logic, regex patterns, rule enforcement
-      - `ex5.exception`: Exception hierarchy, error reporting
+      - `ex5.scope`: Scope hierarchy, variable lookup chain, tree structure + `ScopeException`
+      - `ex5.validator`: Validation logic, regex patterns, rule enforcement + validation exceptions (`VariableException`, `MethodException`, `ConditionException`)
 - **UML Diagram** (`UML.pdf`):
   - Show all packages as containers
   - Class diagrams for each package
@@ -312,6 +338,56 @@ The system follows a pipeline architecture:
 - **Debugging**:
   - Add line number tracking throughout for precise error reporting
   - Test edge cases from requirements (e.g., `_a` valid, `__a` invalid)
+
+## Critical Edge Cases & Tricky Requirements
+
+### Variable Naming Rules (Section 5.2)
+- `_a`, `_0`, `_ab` are VALID (underscore + letter/digit + anything)
+- `_`, `__`, `__a`, `___b` are INVALID (single underscore alone, or starting with two+ underscores)
+- `2g`, `54_a` are INVALID (cannot start with digit)
+- Variables CAN start with underscore, methods CANNOT
+
+### Variable Assignment Syntax (Section 5.2.2)
+- `a = 1, b = 2;` is VALID (multiple assignments)
+- `a, b = 7;` is INVALID (cannot assign same value to multiple vars)
+- `a, b = 1, 2;` is INVALID (not supported syntax)
+
+### Variable Initialization Rules (Section 5.2.1 & 5.2.3)
+- Local variable declared without init can only be used if next appearance is assignment
+- Global variable initialized inside a method is considered initialized for rest of that method
+- Variable initialized in nested scope (e.g., inside if) is considered initialized in outer scope after that line
+- You do NOT check if initialization is reachable (inside `if(false)` counts as initialized)
+
+### Scope and Shadowing (Section 5.2.1)
+- Two local variables with same name cannot be in same block
+- Two local variables with same name CAN be in different blocks, even if nested
+- Local can shadow global
+- Local can shadow parameter (different blocks)
+- Method parameters are local variables of that method
+
+### Method Requirements (Section 5.3)
+- Method names MUST start with letter (not underscore)
+- Return statement MUST exist and be last code statement (empty lines after are OK)
+- Methods can call themselves recursively
+- Methods can be defined in any order (forward references allowed)
+- Method calls ONLY allowed inside methods, NOT in global scope
+
+### Comments and Whitespace (Section 5.1 & 5.5)
+- Only `//` comments allowed (at start of line, no chars before it)
+- `/* */`, `/** */`, mid-line `//` are all ILLEGAL
+- Whitespace REQUIRED between: `void` and method name, `final` and type, type and variable name
+- Whitespace OPTIONAL around: parentheses, `=`, `;`, `{`, `}`
+
+### Type Compatibility (Section 5.2.2)
+- `int` → `double` is allowed
+- `int` and `double` → `boolean` is allowed
+- `boolean` can accept: `true`, `false`, any int value, any double value
+
+### Control Flow Conditions (Section 5.4)
+- Conditions can be: `true`, `false`, boolean/int/double variables, int/double constants
+- Multiple conditions with `&&` and `||` allowed
+- Operators must be BETWEEN expressions (not at start/end): `if(|| a)` is illegal
+- Brackets in conditions NOT supported: `if ((a || b) && c)` is illegal
 
 ## Further Considerations
 
@@ -378,11 +454,19 @@ The system follows a pipeline architecture:
 - No operators, arrays, or multi-line statements
 
 ### Variable Validation
-- Names: letters/digits/underscore, no leading digits, no leading double underscore
-- Declaration: with or without initialization, comma-separated allowed
-- Multiple variables per line with mixed initialization
-- Final modifier: must initialize, cannot reassign
-- Scope rules: global uniqueness, local shadowing allowed, initialization before use
+- **Names**: 
+  - Variables: letters/digits/underscore, NO leading digits, NO leading double underscore (__ is illegal)
+  - Can start with single underscore if followed by letter/digit: `_a` valid, `_` and `__a` invalid
+  - Methods: MUST start with letter (not underscore, not digit)
+- **Declaration**: with or without initialization, comma-separated allowed with mixed initialization
+- **Assignment**: Multiple assignments allowed in one line: `a = 1, b = 2;` (each must have value)
+  - NOT allowed: `a, b = 7;` or `a, b = 1, 2;`
+- **Final modifier**: must initialize at declaration, cannot reassign later
+- **Scope rules**: 
+  - Global uniqueness (no two globals with same name)
+  - Local shadowing allowed (local can shadow global or outer scope local)
+  - Initialization before use (complex rule: see section 5.2.3)
+  - Variables can have same name as methods
 
 ### Method Validation
 - Only void methods supported
