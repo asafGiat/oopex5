@@ -98,6 +98,13 @@ The system follows a **single-pass validation architecture** where validation ha
     - `BOOLEAN_VALUE` - `true|false|INT_VALUE|DOUBLE_VALUE`
     - `CHAR_VALUE` - `'[^'\\]'`
     - `STRING_VALUE` - `"[^"\\]*"`
+    - `IDENTIFIER_AS_VALUE` - `VARIABLE_NAME` (variables can be used as values - must validate they're initialized and type-compatible)
+    - **Note**: Values can be either literals (above patterns) OR variables (identifier pattern). Need to check both during validation.
+  - **Value Validation Method**:
+    - `static boolean isValidValueForType(String value, String expectedType, Scope scope)`:
+      - If value matches literal pattern for expectedType → return true
+      - If value matches IDENTIFIER_AS_VALUE → check it's initialized variable with compatible type in scope
+      - Otherwise → return false
   - **Method Patterns**:
     - `METHOD_DECLARATION` - `void\s+METHOD_NAME\s*\(PARAMS?\)\s*\{`
     - `METHOD_CALL` - `METHOD_NAME\s*\(ARGS?\)\s*;`
@@ -134,9 +141,13 @@ The system follows a **single-pass validation architecture** where validation ha
     - `static Method getMethod(String name)` - Retrieve method from global registry
     - `static boolean methodExists(String name)` - Check if method is defined
     - **`protected void validateStatements(List<ProcessedLine> lines, int startIdx, int endIdx)`** - **Common method** for parsing and validating statements line-by-line (shared by MethodScope and BlockScope):
-      - Variable declarations → parse, add to scope, validate
-      - Assignments → validate variable exists, types match, initialized
-      - Method calls → validate method exists, args match
+      - Variable declarations → parse, add to scope, validate (use `VariableValidator.validateValue()` for initialization values)
+      - Assignments → validate:
+        - Parse target variable(s) and value(s)
+        - Check target variable exists and is not final
+        - Use `VariableValidator.validateValue()` to validate each value (handles both literals and variables)
+        - Mark target variable as initialized after successful assignment
+      - Method calls → validate method exists, args match (use `MethodValidator.validateMethodCall()`)
       - if/while statements → create BlockScope, immediately call its validate()
       - return statements → mark and validate (MethodScope only)
       - Closing `}` → return control to parent
@@ -152,13 +163,18 @@ The system follows a **single-pass validation architecture** where validation ha
          - Identify and list all method signatures (register them via `Scope.registerMethod()`)
          - Track `{` and `}` to know which lines belong to each method
       3. **Phase 1**: Register all methods in static registry
-      4. **Phase 2**: Validate global variables before methods
+      4. **Phase 2A**: Validate global variable declarations
          - Validate each global variable: syntax, naming, type, initialization
          - Check for duplicate names
-      5. **Phase 3**: Call `validate()` on each method's scope
+      5. **Phase 2B**: Process and validate global assignment statements
+         - Parse assignment statements at global level (e.g., `x = 5;`)
+         - Validate: assigned variable exists, is not final, value type is compatible
+         - Mark variables as initialized after assignment
+         - **Note**: Global variables can be assigned both in global scope and inside methods (per requirements 5.2.2)
+      6. **Phase 3**: Call `validate()` on each method's scope
          - For each `MethodScope` in order, call its `validate()` method
          - Pass relevant line range to each MethodScope
-      6. Return success if all validation passes
+      7. Return success if all validation passes
 - **`MethodScope extends Scope`**:
   - Additional attributes:
     - `Method methodDefinition` - Reference to Method object
@@ -166,6 +182,9 @@ The system follows a **single-pass validation architecture** where validation ha
   - Additional methods:
     - `addParameter(Variable param)` - Add parameter to variable table
     - `recordStatement(int lineNumber, StatementType type)` - Track statements, update lastStatementLine
+      - **Note**: Only update lastStatementLine for actual code statements (not empty lines)
+      - This ensures validation checks the last actual statement, not an empty line
+      - Per requirements 5.3: "empty lines or lines with spaces are allowed" after return
     - `validate(List<ProcessedLine> lines, int startIdx, int endIdx)` - **Method Scope Validation Process**:
       1. **Parse and validate method signature**: name, parameters (syntax, types, naming, final handling)
       2. **Add parameters to variable table** (mark as initialized)
@@ -224,6 +243,14 @@ Validation logic is implemented in helper classes and called from within each sc
 - **`VariableValidator`** (static utility class):
   - `validateVariableName(String name)` - Check naming rules (no leading digit, no `__`, etc.)
   - `validateTypeCompatibility(String targetType, String sourceType)` - Check if assignment is valid using `RegexManager.isTypeCompatible(targetType, sourceType)`
+  - `validateValue(String value, String expectedType, Scope scope)` - **Validate a value (literal or variable)**:
+    - If value is a literal (matches literal pattern for expectedType) → validate format is correct
+    - If value is a variable (matches IDENTIFIER pattern):
+      - Check variable exists in scope (use `scope.findVariable()`)
+      - Check variable is initialized
+      - Check variable type is compatible with expectedType (use `RegexManager.isTypeCompatible()`)
+    - Otherwise → throw VariableException
+    - **Critical**: Per requirements 5.2, "value can be a legal value for type OR another existing and initialized variable of the same type"
   - `validateVariableUsage(Scope, String varName, int lineNumber)` - Check variable initialized before use
     - **Critical Rule from 5.2.1**: Local variable not initialized at declaration can only be used if:
       1. Next line where it appears is an assignment to it, OR
@@ -238,14 +265,32 @@ Validation logic is implemented in helper classes and called from within each sc
 - **`MethodValidator`** (static utility class):
   - `validateMethodSignature(String methodName, List<Variable> params)` - Check naming (must start with letter), parameters
     - **Note**: Only void methods are supported, no return type validation needed
-  - `validateMethodCall(String methodName, List<String> args)` - Check method exists via `Scope.methodExists()`, argument count and types match parameters
-    - Use `RegexManager.isTypeCompatible()` for parameter type checking
+  - `validateMethodCall(String methodName, List<String> argStrings, Scope scope)` - **Validate method call**:
+    - Check method exists via `Scope.methodExists()`
+    - Get method definition from registry
+    - Validate argument count matches parameter count
+    - For each argument string:
+      - Determine if it's a literal or variable (try matching against literal patterns, then identifier pattern)
+      - If literal: extract type from which pattern it matches
+      - If variable: lookup variable in scope, get its type, check it's initialized
+      - Check type compatibility with corresponding parameter using `RegexManager.isTypeCompatible()`
+    - Throw `MethodException` on any mismatch
   - `validateLastStatementIsReturn(int lastStatementLine, List<ProcessedLine> lines)` - Verify last statement is return (ignoring empty lines after)
 
 - **`ControlFlowValidator`** (static utility class):
-  - `validateCondition(String condition, Scope scope)` - Parse condition, check boolean expression syntax
-  - `validateConditionVariables(String condition, Scope scope)` - Verify variables in condition exist and are initialized
-  - `validateOperators(String condition)` - Check `&&` and `||` placement (between expressions, not at start/end)
+  - `validateCondition(String condition, Scope scope)` - **Parse and validate condition**:
+    - Split condition by `&&` and `||` operators (handle as separate components)
+    - For each component (trim whitespace):
+      - If matches boolean literal (`true` or `false`) → valid
+      - If matches int literal pattern → valid (ints can be conditions)
+      - If matches double literal pattern → valid (doubles can be conditions)
+      - If matches identifier pattern:
+        - Check variable exists in scope and is initialized
+        - Check variable type is `boolean`, `int`, or `double`
+      - Otherwise → throw ConditionException
+    - Per requirements 5.4: "condition is true/false, initialized boolean/double/int variable, or double/int constant"
+  - `validateConditionVariables(String condition, Scope scope)` - Helper: verify variables in condition exist and are initialized
+  - `validateOperators(String condition)` - Check `&&` and `||` placement (between expressions, not at start/end: `if(|| a)` is illegal)
 
 - **RegexManager usage**:
   - Called from validators to parse and match patterns
