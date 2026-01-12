@@ -4,14 +4,18 @@ Build a Java verifier tool that validates simplified Java syntax (s-Java) using 
 
 ## Architecture Overview
 
-The system follows a pipeline architecture:
-1. **File Reading** → 2. **Preprocessing** → 3. **Parsing & Scope Building** → 4. **Validation** → 5. **Output**
+The system follows a **single-pass validation architecture** where validation happens during parsing:
+1. **File Reading** → 2. **Parser (entry point)** → 3. **Preprocessor** → 4. **Scope Tree Building with Simultaneous Validation** → 5. **Output**
+
+**Key Insight**: Validation is integrated into the scope validation process, not separated. Each scope validates its content as it's parsed, and nested scopes are validated before parent scopes continue.
 
 ### Package Structure
 - `ex5.main` - Entry point (`Sjavac` class) + `InvalidFileException` (thrown by main)
+  - Main only calls `CodeParser.parse(filePath)`
+  - Parser handles everything else internally
 - `ex5.preprocessor` - Line cleanup (`CodePreprocessor`) + `PreprocessorException`
 - `ex5.parser` - Parsing logic (`CodeParser`) + `ParserException`
-- `ex5.models` - Data models (`Variable`, `VariableTable`, `Method`, `Statement`)
+- `ex5.models` - Data models (`ProcessedLine`, `Variable`, `VariableTable`, `Method`, `Statement`)
 - `ex5.scope` - Scope hierarchy (`Scope`, `GlobalScope`, `MethodScope`, `BlockScope`) + `ScopeException`
 - `ex5.validator` - Validation logic and `RegexManager` + `VariableException`, `MethodException`, `ConditionException`
 
@@ -31,6 +35,10 @@ The system follows a pipeline architecture:
   - Composition relationships (e.g., `Scope` contains `VariableTable`)
 
 ### 2. Implement Models Package (`ex5.models`)
+- **`ProcessedLine` class**:
+  - Represents a single line from the preprocessed file
+  - Attributes: `int originalLineNumber`, `String content`
+  - Used by preprocessor, parser, and all scopes
 - **`Variable` class**: 
   - Attributes: `String name`, `String type`, `boolean isFinal`, `boolean isInitialized`, `int lineNumber`, `boolean isParameter`
   - Methods: getters, setters, `initialize()`, `canAssign()` (check if final)
@@ -53,25 +61,31 @@ The system follows a pipeline architecture:
 ### 3. Implement Preprocessor (`ex5.preprocessor.CodePreprocessor`)
 - Create `CodePreprocessor` class responsible for:
   - Reading file line by line
-  - Removing comment lines (lines where first non-whitespace chars are `//`)
-  - Detecting illegal comment formats (`/* */`, `/** */`, mid-line `//` after code)
-  - Identifying empty lines (only whitespace) - track but preserve for line numbering
+  - **Removing supported comment lines**: lines where first non-whitespace chars are `//`
+  - **Removing empty lines**: lines containing only whitespace
   - Trimming leading/trailing whitespace from code lines
-  - Preserving original line numbers for error reporting
-  - **Note**: Do NOT normalize internal whitespace - validation must check for required spaces:
-    - Between `void` and method name (e.g., `voidfoo()` is illegal)
-    - Between `final` and type (e.g., `finalint` is illegal)
-    - Between type and variable name (e.g., `inta` is illegal)
-- Output: `List<ProcessedLine>` where `ProcessedLine` contains:
-  - `int originalLineNumber`
-  - `String cleanedContent`
-  - `LineType type` (EMPTY, COMMENT, CODE, INVALID)
-- Validation during preprocessing:
-  - Detect `/*` or `/**` anywhere → throw exception
-  - Detect `//` not at start of line (after code) → throw exception
+  - Preserving original line numbers for error reporting (track line number mapping)
+  - **NOT checking for illegal comments** (`/* */`, `/** */`, mid-line `//`) - these will be caught during validation
+- Output: `List<ProcessedLine>` (from `ex5.models` package)
+- **Note**: Do NOT normalize internal whitespace - validation must check for required spaces:
+  - Between `void` and method name (e.g., `voidfoo()` is illegal)
+  - Between `final` and type (e.g., `finalint` is illegal)
+  - Between type and variable name (e.g., `inta` is illegal)
+- Throw `PreprocessorException` only for IO errors, not for syntax issues
 
 ### 4. Implement RegexManager (`ex5.validator.RegexManager`)
-- Create `RegexManager` class with static final `Pattern` constants:
+- Create `RegexManager` class with static final `Pattern` constants and type compatibility map:
+  - **Type Compatibility Map**:
+    - `static final Map<String, Set<String>> TYPE_COMPATIBILITY` - Maps types to types that can be assigned to them
+    - Example:
+      ```java
+      TYPE_COMPATIBILITY.put("int", Set.of("int"));
+      TYPE_COMPATIBILITY.put("double", Set.of("int", "double"));
+      TYPE_COMPATIBILITY.put("boolean", Set.of("int", "double", "boolean"));
+      TYPE_COMPATIBILITY.put("String", Set.of("String"));
+      TYPE_COMPATIBILITY.put("char", Set.of("char"));
+      ```
+    - Use: `RegexManager.isTypeCompatible(String targetType, String sourceType)` returns `TYPE_COMPATIBILITY.get(targetType).contains(sourceType)`
   - **Variable & Type Patterns**:
     - `TYPE_PATTERN` - Match valid types: `(int|double|boolean|char|String)`
     - `VARIABLE_NAME` - Valid variable names: `([a-zA-Z][a-zA-Z0-9_]*|_[a-zA-Z0-9][a-zA-Z0-9_]*)` (letter+any OR underscore+letter/digit+any, but NOT __, NOT starting with digit)
@@ -108,6 +122,7 @@ The system follows a pipeline architecture:
     - `List<Scope> childScopes` - Nested scopes (methods/blocks)
     - `List<Statement> statements` - Statements in this scope
     - `int startLine`, `int endLine` - Line range
+    - `static Map<String, Method> globalMethods` - **Static registry of all methods in the file** (shared across all scopes)
   - Methods:
     - `addVariable(Variable v)` - Add to local variable table
     - `findVariable(String name)` - Search this scope, then recursively search parent
@@ -115,72 +130,101 @@ The system follows a pipeline architecture:
     - `addChildScope(Scope child)` - Link child scope
     - `abstract void validate()` - Validate this scope (implemented by subclasses)
     - `getDepth()` - Calculate nesting depth
+    - `static void registerMethod(Method m)` - Add method to global registry (call during GlobalScope parsing)
+    - `static Method getMethod(String name)` - Retrieve method from global registry
+    - `static boolean methodExists(String name)` - Check if method is defined
+    - **`protected void validateStatements(List<ProcessedLine> lines, int startIdx, int endIdx)`** - **Common method** for parsing and validating statements line-by-line (shared by MethodScope and BlockScope):
+      - Variable declarations → parse, add to scope, validate
+      - Assignments → validate variable exists, types match, initialized
+      - Method calls → validate method exists, args match
+      - if/while statements → create BlockScope, immediately call its validate()
+      - return statements → mark and validate (MethodScope only)
+      - Closing `}` → return control to parent
 - **`GlobalScope extends Scope`**:
   - Additional attributes:
-    - `Map<String, Method> methods` - All method definitions in file
+    - `List<ProcessedLine> lines` - Preprocessed lines received from parser
   - Additional methods:
-    - `addMethod(Method m)` - Add method with name uniqueness check
-    - `getMethod(String name)` - Retrieve method definition
-    - `methodExists(String name)` - Check if method is defined
-    - `validate()` - Validate all global variables, then validate each method
+    - `validate(List<ProcessedLine> lines)` - **Global Scope Validation Process**:
+      1. Store preprocessed lines
+      2. Parse global scope:
+         - Iterate through all preprocessed lines
+         - Identify and list all global variable declarations
+         - Identify and list all method signatures (register them via `Scope.registerMethod()`)
+         - Track `{` and `}` to know which lines belong to each method
+      3. **Phase 1**: Register all methods in static registry
+      4. **Phase 2**: Validate global variables before methods
+         - Validate each global variable: syntax, naming, type, initialization
+         - Check for duplicate names
+      5. **Phase 3**: Call `validate()` on each method's scope
+         - For each `MethodScope` in order, call its `validate()` method
+         - Pass relevant line range to each MethodScope
+      6. Return success if all validation passes
 - **`MethodScope extends Scope`**:
   - Additional attributes:
     - `Method methodDefinition` - Reference to Method object
-    - `boolean hasReturn` - Track if return statement found
-    - `int returnLine` - Line number of return statement
+    - `int lastStatementLine` - Track line number of last non-empty statement (to check if it's return)
   - Additional methods:
     - `addParameter(Variable param)` - Add parameter to variable table
-    - `setReturn(int line)` - Mark return statement
-    - `validateReturn()` - Ensure return exists and is last statement (ignore empty lines)
-    - `validate()` - Validate method body, parameters, return, and nested scopes
+    - `recordStatement(int lineNumber, StatementType type)` - Track statements, update lastStatementLine
+    - `validate(List<ProcessedLine> lines, int startIdx, int endIdx)` - **Method Scope Validation Process**:
+      1. **Parse and validate method signature**: name, parameters (syntax, types, naming, final handling)
+      2. **Add parameters to variable table** (mark as initialized)
+      3. **Parse method body** using **`validateStatements(lines, bodyStartIdx, endIdx)`** (inherited from Scope):
+         - This method is shared with BlockScope
+         - Handles: variable declarations, assignments, method calls, if/while blocks, return
+      4. **Validate return statement**: Check if statement at `lastStatementLine` is a return statement
+         - Don't care about return statements in the middle of the method
+      5. Return success if all validation passes
+      
+  **Note**: The only difference from BlockScope is:
+  - MethodScope validates parameters at start
+  - MethodScope validates that last statement is return at end
+  - Inner statement validation is identical (uses shared `validateStatements()` method)
 - **`BlockScope extends Scope`** (for if/while):
   - Additional attributes:
     - `String blockType` - "if" or "while"
     - `String condition` - Condition expression
+    - `int blockEndLine` - Line where closing `}` is
   - Additional methods:
     - `validateCondition()` - Validate condition syntax and variable references
-    - `validate()` - Validate condition, then validate block contents and nested scopes
+    - `validate(List<ProcessedLine> lines, int startIdx, int endIdx)` - **Block Scope Validation Process**:
+      1. **Parse and validate condition**: syntax, variables exist and initialized
+      2. **Parse block contents** using **`validateStatements(lines, bodyStartIdx, endIdx)`** (inherited from Scope):
+         - This method is shared with MethodScope
+         - Handles: variable declarations, assignments, method calls, nested if/while blocks
+      3. Return control to parent with `blockEndLine` set
+      
+  **Note**: The only difference from MethodScope is:
+  - BlockScope validates condition at start (instead of parameters)
+  - BlockScope does NOT validate return statement
+  - Inner statement validation is identical (uses shared `validateStatements()` method)
 
 ### 6. Implement Parser (`ex5.parser.CodeParser`)
-- Create `CodeParser` class to build scope tree from preprocessed lines:
-  - **Phase 1: First Pass - Build Global Scope**
-    - Create `GlobalScope` object
-    - Iterate through all preprocessed lines
-    - Identify global variable declarations using `RegexManager.VARIABLE_DECLARATION`
-    - Identify method signatures using `RegexManager.METHOD_DECLARATION`
-    - For methods: create `Method` object, add to GlobalScope, track brace positions
-    - For global variables: parse and add to GlobalScope's VariableTable
-    - Track opening/closing braces to identify method body boundaries
-  - **Phase 2: Parse Each Method Body**
-    - For each identified method:
-      - Create `MethodScope` and link to GlobalScope
-      - Parse method parameters, create `Variable` objects, add to MethodScope's VariableTable
-      - Iterate through method body lines:
-        - **Variable declaration**: Parse with regex, add to current scope's VariableTable
-        - **Assignment**: Create assignment Statement, validate later
-        - **Method call**: Create method call Statement, validate later
-        - **if/while**: Create `BlockScope`, recursively parse block contents, link to parent
-        - **return**: Mark in MethodScope, verify syntax
-        - **Closing brace `}`**: Pop scope stack (return to parent scope)
-      - Maintain scope stack for nested blocks
-  - **Phase 3: Finalize Scope Tree**
-    - Verify all braces are balanced
-    - Ensure all methods have closing braces
-    - Return root `GlobalScope` with complete tree structure
+- Create `CodeParser` class as the main entry point for validation:
+  - **`GlobalScope parse(String filePath)` method** (throws exceptions):
+    1. **Call preprocessor**: `List<ProcessedLine> lines = CodePreprocessor.preprocess(filePath)`
+    2. Create `GlobalScope` instance
+    3. Call `globalScope.validate(lines)` - pass preprocessed lines to GlobalScope
+    4. Return the validated `GlobalScope`
+- **Parser responsibilities**:
+  - Coordinate preprocessor and scope validation
+  - Pass preprocessed lines to GlobalScope
+  - Handle exceptions from preprocessor and validation
+- **GlobalScope responsibilities**:
+  - Receive preprocessed lines from parser
+  - Parse and validate using those lines
+  - Pass line ranges to MethodScope and BlockScope as needed
 - Use `RegexManager` patterns throughout for line type identification
-- Throw `SyntaxException` with line number for parsing errors
+- Throw `ParserException` with line number for parsing errors
+- Line number tracking: Preprocessor maintains mapping from preprocessed line index to original file line number
 
-### 7. Implement Validators (`ex5.validator`)
-- **`GlobalValidator`**:
-  - `validateGlobalVariables(GlobalScope)` - Check syntax, naming rules, no duplicates
-  - `validateMethodSignatures(GlobalScope)` - Check naming, parameters, no duplicates/overloading
-    - Method names MUST start with a letter (not underscore or digit)
-    - Methods and variables CAN have the same name (this is allowed)
-  - `validateNoMethodCallsInGlobal(GlobalScope)` - Ensure no method calls in global scope
-- **`VariableValidator`**:
+### 7. Implement Validators (integrated into Scope.validate() methods)
+Validation logic is implemented in helper classes and called from within each scope's validate() method:
+
+- **`VariableValidator`** (static utility class):
   - `validateVariableName(String name)` - Check naming rules (no leading digit, no `__`, etc.)
-  - `validateTypeCompatibility(String fromType, String toType)` - Check assignments (int→double, int/double→boolean allowed)
-  - `validateInitializationBeforeUse(Scope, Statement)` - Check variable initialized before use in expressions
+  - `validateTypeCompatibility(String targetType, String sourceType)` - Check if assignment is valid using `RegexManager.isTypeCompatible(targetType, sourceType)`
+  - `validateVariableUsage(Scope, String varName, int lineNumber)` - Check variable initialized before use
     - **Critical Rule from 5.2.1**: Local variable not initialized at declaration can only be used if:
       1. Next line where it appears is an assignment to it, OR
       2. It is never used
@@ -190,29 +234,22 @@ The system follows a pipeline architecture:
       - You do NOT need to check if initialization is reachable (e.g., inside `if(false)` is OK)
   - `validateFinalVariable(Variable)` - Check final variables initialized at declaration, not reassigned
   - `validateScopeAccess(Scope, String varName)` - Verify variable accessible from current scope
-    - **Critical from 5.2.3**: You CANNOT access a variable defined in a more internal scope
-    - Can access: (1) local var in current or outer scope, (2) global var if in any method, (3) global var in global scope after definition line
-- **`MethodValidator`**:
-  - `validateMethodCall(MethodScope, String methodName, List<String> args)` - Check method exists, arg count/types match
-  - `validateReturnStatement(MethodScope)` - Verify return exists and is last statement (ignoring empty lines)
-    - **Critical**: Return must be last code statement (empty lines/whitespace after are OK)
-    - **Note**: You do NOT need to check for unreachable code after previous return statements
-  - `validateParameters(Method)` - Check parameter syntax, types, names
-  - `validateFinalParameters(MethodScope)` - Ensure final params not reassigned in method body
-- **`ControlFlowValidator`**:
-  - `validateCondition(BlockScope)` - Parse condition, check boolean expression syntax
-  - `validateConditionVariables(BlockScope, String condition)` - Verify variables in condition exist and are initialized
+
+- **`MethodValidator`** (static utility class):
+  - `validateMethodSignature(String methodName, List<Variable> params)` - Check naming (must start with letter), parameters
+    - **Note**: Only void methods are supported, no return type validation needed
+  - `validateMethodCall(String methodName, List<String> args)` - Check method exists via `Scope.methodExists()`, argument count and types match parameters
+    - Use `RegexManager.isTypeCompatible()` for parameter type checking
+  - `validateLastStatementIsReturn(int lastStatementLine, List<ProcessedLine> lines)` - Verify last statement is return (ignoring empty lines after)
+
+- **`ControlFlowValidator`** (static utility class):
+  - `validateCondition(String condition, Scope scope)` - Parse condition, check boolean expression syntax
+  - `validateConditionVariables(String condition, Scope scope)` - Verify variables in condition exist and are initialized
   - `validateOperators(String condition)` - Check `&&` and `||` placement (between expressions, not at start/end)
-  - `validateBraceMatching(BlockScope)` - Ensure proper `{` and `}` structure
-- **`ScopeTreeValidator`** (main coordinator):
-  - `validate(GlobalScope root)` - Entry point for validation
-  - Traverse scope tree depth-first:
-    1. Validate GlobalScope (global vars, method signatures)
-    2. For each MethodScope: validate parameters, body, return
-    3. For each BlockScope: validate condition, contents
-    4. Recursively validate all child scopes
-  - On first error, throw appropriate exception and stop validation
-  - Coordinate calls to specific validators
+
+- **RegexManager usage**:
+  - Called from validators to parse and match patterns
+  - Patterns are used during both parsing and validation
 
 ### 8. Implement Exception Hierarchy (distributed across packages)
 **Important**: Per requirements 6.1, each exception must be in the same package as the class that throws it.
@@ -254,19 +291,12 @@ The system follows a pipeline architecture:
               throw new InvalidFileException("File must have .sjava extension");
           }
           
-          // 2. Read and preprocess file
-          CodePreprocessor preprocessor = new CodePreprocessor();
-          List<ProcessedLine> lines = preprocessor.preprocess(filePath);
-          
-          // 3. Parse and build scope tree
+          // 2. Parse and validate the file
+          // Parser internally calls preprocessor and validates scopes
           CodeParser parser = new CodeParser();
-          GlobalScope globalScope = parser.parse(lines);
+          GlobalScope globalScope = parser.parse(filePath);
           
-          // 4. Validate scope tree
-          ScopeTreeValidator validator = new ScopeTreeValidator();
-          validator.validate(globalScope);
-          
-          // 5. Success - code is valid
+          // 3. Success - code is valid
           System.out.println(0);
           
       } catch (InvalidFileException e) {
@@ -281,9 +311,8 @@ The system follows a pipeline architecture:
       }
   }
   ```
-- File reading: Use `BufferedReader` with try-with-resources in CodePreprocessor
-- Coordinate entire validation pipeline
-- Proper exception handling with specific catches
+- Main is very simple: only validates arguments and calls parser
+- Parser handles all logic including preprocessor and scope validation
 
 ### 10. Create README & UML Documentation
 - **README structure**:
@@ -339,6 +368,47 @@ The system follows a pipeline architecture:
   - Add line number tracking throughout for precise error reporting
   - Test edge cases from requirements (e.g., `_a` valid, `__a` invalid)
 
+## Data Flow and Control Flow
+
+### Execution Flow
+```
+main(args[])
+  └─> CodeParser.parse(filePath)
+       ├─> CodePreprocessor.preprocess(filePath) [Parser calls preprocessor - reads file, removes comments/empty lines]
+       │    └─> returns List<ProcessedLine>
+       └─> GlobalScope.validate(lines) [Parser passes preprocessed lines to GlobalScope]
+            ├─> [Global parsing phase 1] List all methods, register in static registry
+            ├─> [Global parsing phase 2] Validate all global variables
+            └─> [Global parsing phase 3] For each method:
+                 └─> MethodScope.validate(lines, startIdx, endIdx) [Receives line range]
+                      ├─> Validate parameters
+                      └─> validateStatements(lines, bodyStart, endIdx) [SHARED METHOD from base Scope]
+                           ├─> Variable declaration? Add to scope, validate
+                           ├─> Assignment? Validate variable exists, types match
+                           ├─> Method call? Validate method exists (via static registry)
+                           ├─> if/while? Create BlockScope and immediately call:
+                           │    └─> BlockScope.validate(lines, startIdx, endIdx) [Receives line range]
+                           │         ├─> Validate condition
+                           │         └─> validateStatements(lines, bodyStart, endIdx) [SHARED METHOD from base Scope]
+                           │              ├─> Can have nested blocks → recursive validate()
+                           │              └─> When closing } reached, return with blockEndLine
+                           │    └─> [Continue from line after }]
+                           └─> return? Validate and mark
+                      └─> Validate return exists and is last
+       └─> return GlobalScope
+  └─> System.out.println(0) [success]
+  └─> catch SyntaxException → System.err + System.out.println(1)
+  └─> catch InvalidFileException → System.err + System.out.println(2)
+```
+
+### Key Architectural Differences from Original Plan
+1. **Parser calls preprocessor** - CodeParser.parse() calls CodePreprocessor.preprocess() at the start
+2. **Scopes receive preprocessed lines** - Parser passes lines to GlobalScope, which passes line ranges to child scopes
+3. **Shared validation logic** - MethodScope and BlockScope share `validateStatements()` method for inner statements
+4. **MethodScope vs BlockScope** - Only differ in parameter/condition validation and return checking
+5. **Nested scope handling** - Immediately validate when encountered, parent continues after
+6. **Method lookup via static registry** - Register all methods before validating any method body
+
 ## Critical Edge Cases & Tricky Requirements
 
 ### Variable Naming Rules (Section 5.2)
@@ -392,51 +462,48 @@ The system follows a pipeline architecture:
 ## Further Considerations
 
 ### 1. Preprocessor Scope
-**Question**: Should preprocessor normalize all whitespace or preserve some structure?
-**Recommendation**: Trim leading/trailing whitespace only. Let regex patterns in validation handle internal whitespace using `\s*` and `\s+` appropriately. This keeps preprocessor simple and validation flexible.
+**Question**: Should preprocessor only remove supported comments and empty lines?
+**Recommendation**: Yes. Remove `//` comments and empty lines completely. Do NOT report errors for unsupported comment formats (`/* */`, etc.) - those will be caught during validation when the parser doesn't recognize them.
 
-### 2. Scope Tree vs. Two-Pass Parsing
+### 2. Single-Pass Validation vs. Two-Pass
 **Question**: Build complete scope tree first, then validate? Or validate during parsing?
-**Recommendation**: Build complete tree first, then validate. This approach:
-- Allows forward method references (methods can be called before they're defined)
-- Separates parsing concerns from validation logic
-- Makes code more maintainable and testable
-- Enables better error messages (can reference method signatures during validation)
+**Recommendation**: Validate during scope traversal (single-pass). Key advantages:
+- Stop at first error immediately without building unnecessary scope structures
+- Simpler memory usage (don't store entire tree)
+- Natural recursive structure matches scope hierarchy
+- Nested scopes are validated immediately when encountered, parent continues after
+- Still allows forward method references via static method registry
 
-### 3. Statement Object Necessity
-**Question**: Do we need explicit `Statement` objects, or just validate during parsing?
-**Recommendation**: Use lightweight `Statement` objects storing type and line number. Benefits:
-- Helps validate statement order (e.g., return is last)
-- Improves error reporting with precise line numbers
-- Allows two-pass validation (structure first, semantics second)
-- Not over-engineered - just type enum + line number
+### 3. Method Registry Implementation
+**Question**: How to handle forward method references without building tree first?
+**Recommendation**: Use static `Map<String, Method> globalMethods` in base `Scope` class:
+- During global scope parsing, first pass registers all method signatures
+- Second pass validates global variables
+- Third pass validates each method, which can safely call any registered method
 
-### 4. Variable Table Implementation
-**Question**: Use `HashMap<String, Variable>` or more complex structure?
-**Recommendation**: Use `HashMap<String, Variable>` for simplicity and O(1) lookup. No need for `LinkedHashMap` since declaration order doesn't affect validation (except initialization before use, which is tracked by line number in Variable objects).
+### 4. Line Number Mapping
+**Question**: How to track original line numbers when preprocessor removes lines?
+**Recommendation**: Maintain mapping from preprocessed line index to original file line number. When reporting errors, use original line number.
 
-### 5. Method Parameter Handling
-**Question**: Store parameters separately or in method's VariableTable?
-**Recommendation**: Add parameters to `MethodScope`'s `VariableTable` immediately when parsing method signature. Treat them as local variables with special handling:
-- Mark as initialized by default (parameters always have values when method called)
-- Track if parameter is final (can't be reassigned in method body)
-- No special data structure needed - flag in `Variable` object is sufficient
+### 5. Statement Storage Necessity
+**Question**: Do we need to store Statement objects during parsing?
+**Recommendation**: Minimal use - only track statement type and line for return validation. Don't build full tree.
 
-### 6. Regex Complexity Trade-offs
-**Question**: One comprehensive regex per line type vs. multiple simpler patterns?
-**Recommendation**: Use moderately complex patterns that match entire line structure, then extract parts with capture groups. Example:
-- Variable declaration: One pattern matching `final? type name (= value)? (, name (= value)?)* ;`
-- Then parse captured groups to extract individual variables
-- Avoid splitting into too many tiny patterns (harder to coordinate)
-- Avoid one giant pattern for all line types (impossible to maintain)
+### 6. Scope Boundary Detection
+**Question**: How to know where methods/blocks end?
+**Recommendation**: Track opening `{` and closing `}` braces while parsing. Each `{` increments brace depth, each `}` decrements. Method ends when brace depth returns to 0.
 
-### 7. Error Message Detail Level
-**Question**: How detailed should error messages be?
-**Recommendation**: Provide context but keep concise:
-- Include line number always
-- Describe what's wrong: "Variable 'x' used before initialization"
-- Optionally hint at fix: "Declare and initialize variable before use"
-- Don't dump regex patterns or technical details in user-facing errors
+### 7. Regex Pattern Reuse
+**Question**: How much validation logic should go in RegexManager vs. validator classes?
+**Recommendation**: RegexManager provides pattern matching and group extraction. Validator classes provide semantic validation (e.g., "variable exists", "type compatible").
+
+### 8. Implementation Order: Validators Before Scopes?
+**Question**: Should we implement validators (Step 7) before scopes (Step 5)?
+**Recommendation**: Current order (Scopes before Validators) makes sense because:
+- Validators are **utility classes called by Scopes** - understanding what Scopes need helps design validators
+- Scopes define the validation requirements - validators implement the validation logic
+- Can argue either way, but current order follows "define requirements → implement validation" pattern
+**Alternative**: Could implement RegexManager + basic validators first, then scopes. Both approaches work.
 
 ## Key Requirements Summary
 
