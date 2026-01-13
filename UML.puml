@@ -1,0 +1,155 @@
+@startuml
+' UML diagram for s-Java verifier architecture
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+
+package "ex5.main" {
+  class Sjavac {
+    +main(String[] args)
+  }
+  abstract class SJavaException {
+    -message : String
+    -lineNumber : int
+    +getFormattedMessage() : String
+  }
+  class InvalidFileException extends SJavaException
+  class SyntaxException extends SJavaException
+}
+
+package "ex5.preprocessor" {
+  class CodePreprocessor {
+    +preprocess(String filePath) : List<ProcessedLine>
+  }
+  class PreprocessorException extends SyntaxException
+}
+
+package "ex5.parser" {
+  class CodeParser {
+    +parse(String filePath) : GlobalScope
+  }
+  class ParserException extends SyntaxException
+}
+
+package "ex5.models" {
+  class ProcessedLine {
+    -originalLineNumber : int
+    -content : String
+  }
+  class Variable {
+    -name : String
+    -type : String
+    -isFinal : boolean
+    -isInitialized : boolean
+    -isParameter : boolean
+    -lineNumber : int
+    +initialize() : void
+  }
+  class VariableTable {
+    -variables : HashMap<String, Variable>
+    +addVariable(Variable) : void
+    +getVariable(String) : Variable
+    +containsVariable(String) : boolean
+  }
+  class Method {
+    -name : String
+    -parameters : List<Variable>
+    -scope : MethodScope
+    -declarationLine : int
+    +matchesSignature(String, List<String>) : boolean
+  }
+  enum Statement {
+    VAR_DECLARATION
+    ASSIGNMENT
+    METHOD_CALL
+    IF_BLOCK
+    WHILE_BLOCK
+    RETURN
+  }
+}
+
+package "ex5.scope" {
+  abstract class Scope {
+    -variables : VariableTable
+    -parentScope : Scope
+    -childScopes : List<Scope>
+    -statements : List<Statement>
+    -startLine : int
+    -endLine : int
+    -static globalMethods : Map<String, Method>
+    +addVariable(Variable) : void
+    +findVariable(String) : Variable
+    +validate() : void
+    +addChildScope(Scope) : void
+  }
+  class GlobalScope extends Scope {
+    +validate(List<ProcessedLine>) : void
+  }
+  class MethodScope extends Scope {
+    -methodDefinition : Method
+    +validate(List<ProcessedLine>, int, int) : void
+  }
+  class BlockScope extends Scope {
+    -blockType : String
+    -condition : String
+    +validate(List<ProcessedLine>, int, int) : void
+  }
+  class ScopeException extends SyntaxException
+}
+
+package "ex5.validator" {
+  class RegexManager {
+    +TYPE_COMPATIBILITY : Map<String, Set<String>>
+    +isTypeCompatible(String, String) : boolean
+  }
+  class VariableValidator {
+    +validateValue(String, String, Scope) : void
+    +validateVariableUsage(Scope, String, int) : void
+  }
+  class MethodValidator {
+    +validateMethodCall(String, List<String>, Scope) : void
+    +validateMethodSignature(String, List<Variable>) : void
+  }
+  class ControlFlowValidator {
+    +validateCondition(String, Scope) : void
+  }
+  class VariableException extends SyntaxException
+  class MethodException extends SyntaxException
+  class ConditionException extends SyntaxException
+}
+
+Sjavac --> CodeParser : parse()
+CodeParser --> CodePreprocessor : preprocess()
+CodeParser --> GlobalScope : validate()
+GlobalScope --> MethodScope : owns
+MethodScope --> BlockScope : owns
+Scope *-- VariableTable
+Scope o-- Scope : parent/child
+Scope --> Method : uses registry
+CodePreprocessor --> ProcessedLine : returns
+MethodScope --> Method : methodDefinition
+VariableTable --> Variable
+Method --> Variable : parameters
+MethodValidator ..> Scope
+VariableValidator ..> Scope
+ControlFlowValidator ..> Scope
+ScopeException <|-- GlobalScope
+Scope <|-- GlobalScope
+Scope <|-- MethodScope
+Scope <|-- BlockScope
+SJavaException <|-- InvalidFileException
+SJavaException <|-- SyntaxException
+SyntaxException <|-- PreprocessorException
+SyntaxException <|-- ParserException
+SyntaxException <|-- ScopeException
+SyntaxException <|-- VariableException
+SyntaxException <|-- MethodException
+SyntaxException <|-- ConditionException
+
+note bottom
+Data flow: Sjavac -> CodeParser -> CodePreprocessor -> GlobalScope.validate()
+  -> MethodScope.validate() -> BlockScope.validate()
+end note
+
+@enduml
+
