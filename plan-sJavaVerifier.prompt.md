@@ -31,7 +31,8 @@ The system follows a **single-pass validation architecture** where validation ha
   - Package organization
   - Class relationships and inheritance hierarchy (especially `Scope` hierarchy)
   - Key methods and attributes
-  - Data flow from `Sjavac` → `CodePreprocessor` → `CodeParser` → `ScopeTree` → `Validator`
+  - Data flow: `Sjavac` → `CodeParser` → `CodePreprocessor` → `GlobalScope.validate()` → `MethodScope.validate()` → `BlockScope.validate()`
+    - **Note**: Parser calls Preprocessor (not Main), validation is integrated into Scope.validate() methods (no separate Validator orchestrator)
   - Composition relationships (e.g., `Scope` contains `VariableTable`)
 
 ### 2. Implement Models Package (`ex5.models`)
@@ -384,9 +385,10 @@ Validation logic is implemented in helper classes and called from within each sc
   - Show all packages as containers
   - Class diagrams for each package
   - Highlight inheritance: `Scope` → `GlobalScope`, `MethodScope`, `BlockScope`
-  - Show composition: `Scope` ◆→ `VariableTable`, `GlobalScope` ◆→ `Map<String, Method>`
+  - Show composition: `Scope` ◆→ `VariableTable`, `GlobalScope` stores `static Map<String, Method>`
   - Show associations: `Variable` ← `VariableTable`, `Method` → `MethodScope`
-  - Indicate data flow arrows: `Sjavac` → `CodePreprocessor` → `CodeParser` → `ScopeTreeValidator`
+  - Indicate data flow arrows: `Sjavac` → `CodeParser` → `CodePreprocessor` → `GlobalScope` (with lines) → `MethodScope` → `BlockScope`
+    - Show validators as utility classes called by scopes (dashed arrows from Scope classes to Validator classes)
   - Key methods in each class
 
 ### 11. Testing & Refinement
