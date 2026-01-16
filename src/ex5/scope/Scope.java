@@ -1,9 +1,7 @@
 package ex5.scope;
 
-import ex5.models.Method;
-import ex5.models.Statement;
-import ex5.models.Variable;
-import ex5.models.VariableTable;
+import ex5.models.*;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -17,6 +15,7 @@ public abstract class Scope {
     protected final Scope parentScope;
     protected final List<Scope> childScopes = new ArrayList<>();
     protected final List<Statement> statements = new ArrayList<>();
+    protected final List<ProcessedLine> allLines;
     protected final int startLine;
     protected int endLine;
 
@@ -24,9 +23,25 @@ public abstract class Scope {
     private static final Map<String, Method> globalMethods = new HashMap<>();
 
     protected Scope(Scope parentScope, int startLine) {
+        this(parentScope, startLine, null);
+    }
+
+    protected Scope(Scope parentScope, int startLine, List<ProcessedLine> allLines) {
         this.parentScope = parentScope;
         this.startLine = startLine;
+        // If parentScope is null, use provided list (GlobalScope); otherwise reuse parent's list.
+        if (parentScope == null) {
+            this.allLines = (allLines != null) ? allLines : new ArrayList<>();
+        } else {
+            this.allLines = parentScope.getAllLines();
+        }
     }
+
+    public List<ProcessedLine> getAllLines() {
+        return allLines;
+    }
+
+
 
     public void addVariable(Variable variable) {
         variables.addVariable(variable);

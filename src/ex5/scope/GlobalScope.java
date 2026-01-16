@@ -15,11 +15,9 @@ import java.util.regex.Matcher;
  *   2) Validate each method body
  */
 public class GlobalScope extends Scope {
-    private final List<ProcessedLine> allLines;
 
     public GlobalScope(List<ProcessedLine> allLines) {
-        super(null, 1);
-        this.allLines = allLines;
+        super(null, 1, allLines);
     }
 
     @Override
@@ -79,6 +77,12 @@ public class GlobalScope extends Scope {
                 continue;
             }
 
+            Matcher assignMatcher = RegexManager.getMatcher(content, RegexManager.VARIABLE_ASSIGNMENT);
+            if (assignMatcher.matches()) {
+                processAssignment(content, lineNumber);
+                i++;
+                continue;
+            }
             // Any other line at global scope is an error
             throw new ScopeException("Invalid statement at global scope", lineNumber);
         }
@@ -146,6 +150,41 @@ public class GlobalScope extends Scope {
                 Variable variable = new Variable(varName, type, isFinal, false, false, lineNumber);
                 addVariable(variable);
             }
+        }
+    }
+
+    private void processAssignment(String line, int lineNumber)
+            throws VariableException {
+        // Remove trailing semicolon
+        String withoutSemicolon = line.trim();
+        if (withoutSemicolon.endsWith(";")) {
+            withoutSemicolon = withoutSemicolon.substring(0, withoutSemicolon.length() - 1).trim();
+        }
+
+        // Split by comma for multiple assignments
+        String[] assignments = withoutSemicolon.split(",");
+
+        for (String assignment : assignments) {
+            String trimmed = assignment.trim();
+            String[] parts = trimmed.split("=", 2);
+
+            if (parts.length != 2) {
+                throw new VariableException("Invalid assignment syntax", lineNumber);
+            }
+
+            String varName = parts[0].trim();
+            String value = parts[1].trim();
+
+            Variable variable = findVariable(varName);
+            if (variable == null) {
+                throw new VariableException("Variable not declared: " + varName, lineNumber);
+            }
+
+            VariableValidator.validateAssignmentTarget(variable, lineNumber);
+            VariableValidator.validateValue(value, variable.getType(), this, lineNumber);
+
+            // Mark variable as initialized
+            variable.initialize();
         }
     }
 

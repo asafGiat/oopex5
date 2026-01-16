@@ -1,5 +1,6 @@
 package ex5.scope;
 
+import ex5.models.Method;
 import ex5.models.ProcessedLine;
 import ex5.models.Variable;
 import ex5.validator.*;
@@ -8,38 +9,39 @@ import java.util.List;
 import java.util.regex.Matcher;
 
 /**
- * Block scope: represents an if or while block body.
- * Validates statements within the block.
+ * Method scope: represents a method body with parameters and statements.
+ * Validates parameters, method body statements, and ensures return statement is last.
  */
-public class BlockScope extends Scope {
-    private final String blockType; // "if" or "while"
-    private final String condition;
-    private final List<ProcessedLine> allLines;
-    private final int blockStartIndex; // Index of if/while statement line
-    private final int blockEndIndex; // Index of closing brace
+public class MethodScope extends Scope {
+    private final Method methodDefinition;
+    //private final List<ProcessedLine> allLines;
+    private final int methodStartIndex; // Index of method declaration line
+    private final int methodEndIndex; // Index of closing brace
+    private int lastStatementLine = -1; // Track last actual statement line
 
-    public BlockScope(Scope parentScope, String blockType, String condition, int startIndex, int endIndex) {
-        super(parentScope, parentScope.getAllLines().get(startIndex).getOriginalLineNumber());
-        this.blockType = blockType;
-        this.condition = condition;
-        this.allLines = getTopLevelLines(parentScope);
-        this.blockStartIndex = startIndex;
-        this.blockEndIndex = endIndex;
+    public MethodScope(Scope parentScope, Method method, int startIndex, int endIndex) {
+        super(parentScope, method.getDeclarationLine());
+        this.methodDefinition = method;
+        //this.allLines = ((GlobalScope) parentScope).getAllLines();
+        this.methodStartIndex = startIndex;
+        this.methodEndIndex = endIndex;
         this.endLine = allLines.get(endIndex).getOriginalLineNumber();
-    }
-
-    private List<ProcessedLine> getTopLevelLines(Scope scope) {
-        // Traverse up to GlobalScope to get all lines
-        while (scope.getParentScope() != null) {
-            scope = scope.getParentScope();
-        }
-        return ((GlobalScope) scope).getAllLines();
     }
 
     @Override
     public void validate() {
         try {
-            validateBlockBody();
+            // Step 1: Add parameters to variable table (already validated in GlobalScope)
+            for (Variable param : methodDefinition.getParameters()) {
+                addVariable(param);
+            }
+
+            // Step 2: Validate method body statements
+            validateMethodBody();
+
+            // Step 3: Validate return statement exists and is last
+            validateReturnStatement();
+
         } catch (Exception e) {
             if (e instanceof RuntimeException) {
                 throw (RuntimeException) e;
@@ -48,15 +50,15 @@ public class BlockScope extends Scope {
         }
     }
 
-    private void validateBlockBody() throws ScopeException, VariableException, MethodException, ConditionException {
-        int i = blockStartIndex + 1; // Start after if/while statement line
+    private void validateMethodBody() throws ScopeException, VariableException, MethodException, ConditionException {
+        int i = methodStartIndex + 1; // Start after method declaration line
 
-        while (i <= blockEndIndex) {
+        while (i <= methodEndIndex) {
             ProcessedLine line = allLines.get(i);
             String content = line.getContent();
             int lineNumber = line.getOriginalLineNumber();
 
-            // Skip closing brace of block
+            // Skip closing brace of method
             if (RegexManager.matchesPattern(content, RegexManager.CLOSE_BRACE)) {
                 break;
             }
@@ -68,6 +70,7 @@ public class BlockScope extends Scope {
 
     /**
      * Process a single statement and return the next index to continue from.
+     * Shared logic for statement validation in methods and blocks.
      */
     private int processStatement(String content, int lineNumber, int currentIndex)
             throws ScopeException, VariableException, MethodException, ConditionException {
@@ -76,6 +79,7 @@ public class BlockScope extends Scope {
         Matcher varDeclMatcher = RegexManager.getMatcher(content, RegexManager.VARIABLE_DECLARATION);
         if (varDeclMatcher.matches()) {
             parseAndAddVariableDeclaration(content, lineNumber);
+            lastStatementLine = lineNumber;
             return currentIndex + 1;
         }
 
@@ -83,6 +87,7 @@ public class BlockScope extends Scope {
         Matcher assignMatcher = RegexManager.getMatcher(content, RegexManager.VARIABLE_ASSIGNMENT);
         if (assignMatcher.matches()) {
             processAssignment(content, lineNumber);
+            lastStatementLine = lineNumber;
             return currentIndex + 1;
         }
 
@@ -90,33 +95,37 @@ public class BlockScope extends Scope {
         Matcher methodCallMatcher = RegexManager.getMatcher(content, RegexManager.METHOD_CALL);
         if (methodCallMatcher.matches()) {
             processMethodCall(content, lineNumber);
+            lastStatementLine = lineNumber;
             return currentIndex + 1;
         }
 
-        // Return statement (allowed in blocks within methods)
+        // Return statement
         Matcher returnMatcher = RegexManager.getMatcher(content, RegexManager.RETURN_STATEMENT);
         if (returnMatcher.matches()) {
+            lastStatementLine = lineNumber;
             return currentIndex + 1;
         }
 
         // If block
         Matcher ifMatcher = RegexManager.getMatcher(content, RegexManager.IF_STATEMENT);
         if (ifMatcher.matches()) {
-            String nestedCondition = ifMatcher.group(1);
-            int blockEnd = createAndValidateBlock("if", nestedCondition, lineNumber, currentIndex);
+            String condition = ifMatcher.group(1);
+            int blockEnd = createAndValidateBlock("if", condition, lineNumber, currentIndex);
+            lastStatementLine = lineNumber; // The if statement itself counts
             return blockEnd + 1;
         }
 
         // While block
         Matcher whileMatcher = RegexManager.getMatcher(content, RegexManager.WHILE_STATEMENT);
         if (whileMatcher.matches()) {
-            String nestedCondition = whileMatcher.group(1);
-            int blockEnd = createAndValidateBlock("while", nestedCondition, lineNumber, currentIndex);
+            String condition = whileMatcher.group(1);
+            int blockEnd = createAndValidateBlock("while", condition, lineNumber, currentIndex);
+            lastStatementLine = lineNumber; // The while statement itself counts
             return blockEnd + 1;
         }
 
         // Unrecognized statement
-        throw new ScopeException("Invalid statement in " + blockType + " block", lineNumber);
+        throw new ScopeException("Invalid statement in method body", lineNumber);
     }
 
     private void parseAndAddVariableDeclaration(String line, int lineNumber)
@@ -214,16 +223,16 @@ public class BlockScope extends Scope {
         MethodValidator.validateMethodCall(methodName, args, this, lineNumber);
     }
 
-    private int createAndValidateBlock(String nestedBlockType, String nestedCondition, int lineNumber, int currentIndex)
+    private int createAndValidateBlock(String blockType, String condition, int lineNumber, int currentIndex)
             throws ScopeException, VariableException, MethodException, ConditionException {
         // Validate condition
-        ControlFlowValidator.validateCondition(nestedCondition, this, lineNumber);
+        ControlFlowValidator.validateCondition(condition, this, lineNumber);
 
         // Find block end
         int blockEnd = findBlockEnd(currentIndex, lineNumber);
 
         // Create and validate block scope
-        BlockScope blockScope = new BlockScope(this, nestedBlockType, nestedCondition, currentIndex, blockEnd);
+        BlockScope blockScope = new BlockScope(this, blockType, condition, currentIndex, blockEnd);
         addChildScope(blockScope);
         blockScope.validate();
 
@@ -250,16 +259,31 @@ public class BlockScope extends Scope {
         throw new ScopeException("Unclosed block", startLine);
     }
 
-    public String getBlockType() {
-        return blockType;
+    private void validateReturnStatement() throws MethodException {
+        if (lastStatementLine == -1) {
+            throw new MethodException("Method must contain at least one statement", startLine);
+        }
+
+        // Find the line content for the last statement
+        ProcessedLine lastLine = null;
+        for (ProcessedLine line : allLines) {
+            if (line.getOriginalLineNumber() == lastStatementLine) {
+                lastLine = line;
+                break;
+            }
+        }
+
+        if (lastLine == null) {
+            throw new MethodException("Cannot find last statement", lastStatementLine);
+        }
+
+        if (!RegexManager.matchesPattern(lastLine.getContent(), RegexManager.RETURN_STATEMENT)) {
+            throw new MethodException("Last statement must be return", lastStatementLine);
+        }
     }
 
-    public String getCondition() {
-        return condition;
-    }
-
-    private List<ProcessedLine> getAllLines() {
-        return allLines;
+    public Method getMethodDefinition() {
+        return methodDefinition;
     }
 }
 
