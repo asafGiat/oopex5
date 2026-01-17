@@ -21,5 +21,13 @@ public class SJavaException extends Exception {
         }
         return getMessage();
     }
+
+    /**
+     * Returns the appropriate exit code for this exception.
+     * Default is 1 (syntax error). Override in subclasses for different behavior.
+     */
+    public int getExitCode() {
+        return 1;
+    }
 }
 

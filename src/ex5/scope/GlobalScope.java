@@ -21,20 +21,12 @@ public class GlobalScope extends Scope {
     }
 
     @Override
-    public void validate() {
-        try {
-            // Pass 1: Register methods and global variables
-            firstPass();
+    public void validate() throws ScopeException, VariableException, MethodException, ConditionException {
+        // Pass 1: Register methods and global variables
+        firstPass();
 
-            // Pass 2: Validate each method body
-            secondPass();
-        } catch (Exception e) {
-            // Rethrow wrapped if needed
-            if (e instanceof RuntimeException) {
-                throw (RuntimeException) e;
-            }
-            throw new RuntimeException(e);
-        }
+        // Pass 2: Validate each method body
+        secondPass();
     }
 
     private void firstPass() throws ScopeException, VariableException, MethodException {

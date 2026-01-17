@@ -8,5 +8,10 @@ public class InvalidFileException extends SJavaException {
     public InvalidFileException(String message) {
         super(message, -1);
     }
+
+    @Override
+    public int getExitCode() {
+        return 2;
+    }
 }
 

@@ -37,15 +37,8 @@ public class BlockScope extends Scope {
     }
 
     @Override
-    public void validate() {
-        try {
-            validateBlockBody();
-        } catch (Exception e) {
-            if (e instanceof RuntimeException) {
-                throw (RuntimeException) e;
-            }
-            throw new RuntimeException(e);
-        }
+    public void validate() throws ScopeException, VariableException, MethodException, ConditionException {
+        validateBlockBody();
     }
 
     private void validateBlockBody() throws ScopeException, VariableException, MethodException, ConditionException {

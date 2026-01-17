@@ -1,6 +1,7 @@
 package ex5.scope;
 
 import ex5.models.*;
+import ex5.validator.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -119,6 +120,6 @@ public abstract class Scope {
     /**
      * Validate this scope's content. Implementations parse and validate their relevant lines.
      */
-    public abstract void validate();
+    public abstract void validate() throws ScopeException, VariableException, MethodException, ConditionException;
 }
 

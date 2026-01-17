@@ -9,5 +9,6 @@ public class PreprocessorException extends SyntaxException {
     public PreprocessorException(String message) {
         super(message, -1);
     }
+
 }
 

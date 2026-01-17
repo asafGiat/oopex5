@@ -29,25 +29,17 @@ public class MethodScope extends Scope {
     }
 
     @Override
-    public void validate() {
-        try {
-            // Step 1: Add parameters to variable table (already validated in GlobalScope)
-            for (Variable param : methodDefinition.getParameters()) {
-                addVariable(param);
-            }
-
-            // Step 2: Validate method body statements
-            validateMethodBody();
-
-            // Step 3: Validate return statement exists and is last
-            validateReturnStatement();
-
-        } catch (Exception e) {
-            if (e instanceof RuntimeException) {
-                throw (RuntimeException) e;
-            }
-            throw new RuntimeException(e);
+    public void validate() throws ScopeException, VariableException, MethodException, ConditionException {
+        // Step 1: Add parameters to variable table (already validated in GlobalScope)
+        for (Variable param : methodDefinition.getParameters()) {
+            addVariable(param);
         }
+
+        // Step 2: Validate method body statements
+        validateMethodBody();
+
+        // Step 3: Validate return statement exists and is last
+        validateReturnStatement();
     }
 
     private void validateMethodBody() throws ScopeException, VariableException, MethodException, ConditionException {
