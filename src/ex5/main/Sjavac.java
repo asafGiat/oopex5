@@ -46,7 +46,6 @@ public class Sjavac {
      * Uses polymorphic methods to determine exit code and error message.
      */
     private static void handleSJavaException(SJavaException e) {
-        //TODO: cathe the specific exceptions
         System.out.println(e.getExitCode());
         System.err.println(e.getFormattedMessage());
     }
