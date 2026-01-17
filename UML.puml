@@ -19,14 +19,14 @@ package "ex5.main" {
 
 package "ex5.preprocessor" {
   class CodePreprocessor {
-    +preprocess(String filePath) : List<ProcessedLine>
+    +{static} preprocess(String) : List<ProcessedLine>
   }
   class PreprocessorException extends SyntaxException
 }
 
 package "ex5.parser" {
   class CodeParser {
-    +parse(String filePath) : GlobalScope
+    +{static} parse(String) : GlobalScope
   }
   class ParserException extends SyntaxException
 }
@@ -44,18 +44,24 @@ package "ex5.models" {
     -isParameter : boolean
     -lineNumber : int
     +initialize() : void
+    +canAssign() : boolean
   }
   class VariableTable {
     -variables : HashMap<String, Variable>
     +addVariable(Variable) : void
     +getVariable(String) : Variable
     +containsVariable(String) : boolean
+    +isInitialized(String) : boolean
+    +getAllVariables() : Collection<Variable>
   }
   class Method {
     -name : String
     -parameters : List<Variable>
     -scope : MethodScope
     -declarationLine : int
+    +addParameter(Variable) : void
+    +getParameterCount() : int
+    +getParameterTypes() : List<String>
     +matchesSignature(String, List<String>) : boolean
   }
   enum Statement {
@@ -65,6 +71,10 @@ package "ex5.models" {
     IF_BLOCK
     WHILE_BLOCK
     RETURN
+    --
+    -type : StatementType
+    -lineNumber : int
+    -content : String
   }
 }
 
@@ -76,22 +86,31 @@ package "ex5.scope" {
     -statements : List<Statement>
     -startLine : int
     -endLine : int
-    -static globalMethods : Map<String, Method>
+    -{static} globalMethods : Map<String, Method>
     +addVariable(Variable) : void
     +findVariable(String) : Variable
-    +validate() : void
+    +addStatement(Statement) : void
     +addChildScope(Scope) : void
+    +getDepth() : int
+    +{static} registerMethod(Method) : void
+    +{static} getMethod(String) : Method
+    +{static} methodExists(String) : boolean
+    +{abstract} validate() : void
+    #validateStatements(List<ProcessedLine>, int, int) : void
   }
   class GlobalScope extends Scope {
     +validate(List<ProcessedLine>) : void
   }
   class MethodScope extends Scope {
     -methodDefinition : Method
+    -lastStatementLine : int
+    +addParameter(Variable) : void
     +validate(List<ProcessedLine>, int, int) : void
   }
   class BlockScope extends Scope {
     -blockType : String
     -condition : String
+    -blockEndLine : int
     +validate(List<ProcessedLine>, int, int) : void
   }
   class ScopeException extends SyntaxException
@@ -99,19 +118,30 @@ package "ex5.scope" {
 
 package "ex5.validator" {
   class RegexManager {
-    +TYPE_COMPATIBILITY : Map<String, Set<String>>
-    +isTypeCompatible(String, String) : boolean
+    -{static} TYPE_COMPATIBILITY : Map<String, Set<String>>
+    +{static} isTypeCompatible(String, String) : boolean
+    +{static} matchesPattern(String, Pattern) : boolean
+    +{static} getMatcher(String, Pattern) : Matcher
+    +{static} extractGroups(String, Pattern) : String[]
+    +{static} isValidValueForType(String, String, Scope) : boolean
   }
   class VariableValidator {
-    +validateValue(String, String, Scope) : void
-    +validateVariableUsage(Scope, String, int) : void
+    +{static} validateVariableName(String) : void
+    +{static} validateTypeCompatibility(String, String) : void
+    +{static} validateValue(String, String, Scope) : void
+    +{static} validateVariableUsage(Scope, String, int) : void
+    +{static} validateFinalVariable(Variable) : void
+    +{static} validateScopeAccess(Scope, String) : void
   }
   class MethodValidator {
-    +validateMethodCall(String, List<String>, Scope) : void
-    +validateMethodSignature(String, List<Variable>) : void
+    +{static} validateMethodSignature(String, List<Variable>) : void
+    +{static} validateMethodCall(String, List<String>, Scope) : void
+    +{static} validateLastStatementIsReturn(int, List<ProcessedLine>) : void
   }
   class ControlFlowValidator {
-    +validateCondition(String, Scope) : void
+    +{static} validateCondition(String, Scope) : void
+    +{static} validateConditionVariables(String, Scope) : void
+    +{static} validateOperators(String) : void
   }
   class VariableException extends SyntaxException
   class MethodException extends SyntaxException
@@ -133,7 +163,6 @@ Method --> Variable : parameters
 MethodValidator ..> Scope
 VariableValidator ..> Scope
 ControlFlowValidator ..> Scope
-ScopeException <|-- GlobalScope
 Scope <|-- GlobalScope
 Scope <|-- MethodScope
 Scope <|-- BlockScope
