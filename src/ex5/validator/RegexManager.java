@@ -19,7 +19,7 @@ public final class RegexManager {
     }
 
     // Type compatibility map: target type -> allowed source types
-    public static final Map<String, Set<String>> TYPE_COMPATIBILITY = new HashMap<>();
+    private static final Map<String, Set<String>> TYPE_COMPATIBILITY = new HashMap<>();
 
     // Basic identifier patterns
     public static final Pattern TYPE_PATTERN = Pattern.compile("(int|double|boolean|char|String)");
