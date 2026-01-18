@@ -7,18 +7,28 @@ import java.util.List;
 import java.util.regex.Matcher;
 
 /**
- * Method scope: represents a method body with parameters and statements.
- * Validates parameters, method body statements, and ensures return statement is last.
+ * Represents the scope of a single method in an s-Java source file.
+ * @see ex5.models.Method
+ * @see Scope
  */
 public class MethodScope extends Scope {
     private final Method methodDefinition;
     private final int methodStartIndex; // Index of method declaration line
     private final int methodEndIndex; // Index of closing brace
-    private int lastStatementLine = -1; // Track last actual statement line
+    private static final int NO_STATEMENT = -1;
+    private int lastStatementLine = NO_STATEMENT; // Track last actual statement line
 
     // Per-method table that holds copies of global variables that were UNINITIALIZED in global scope
     private final VariableTable methodGlobalInits = new VariableTable();
 
+    /**
+     * Create a MethodScope for the provided Method descriptor and line indices in the processed lines list.
+     *
+     * @param parentScope enclosing scope (usually GlobalScope)
+     * @param method      method descriptor
+     * @param startIndex  index of the method declaration line within the processed lines list
+     * @param endIndex    index of the closing brace line within the processed lines list
+     */
     public MethodScope(Scope parentScope, Method method, int startIndex, int endIndex) {
         super(parentScope, method.getDeclarationLine());
         this.methodDefinition = method;
@@ -28,6 +38,12 @@ public class MethodScope extends Scope {
         this.endLine = allLines.get(endIndex).getOriginalLineNumber();
     }
 
+    /**
+     * Validate the method scope:
+     * 1. Adds parameters to the variable table.
+     * 2. Populates uninitialized globals.
+     * 3. Validates method body and return statement.
+     */
     @Override
     public void validate() throws ScopeException, VariableException, MethodException, ConditionException, ModelException {
         // Step 1: Add parameters to variable table (already validated in GlobalScope)
@@ -93,6 +109,17 @@ public class MethodScope extends Scope {
         }
     }
 
+    /**
+     * Validate the method body:
+     * - Processes each line from the start of the method to the closing brace.
+     * - Supports variable declarations, assignments, method calls, return statements, and control flow blocks (if/while).
+     *
+     * @throws ScopeException     if there's an invalid statement.
+     * @throws VariableException  if there's a variable-related issue.
+     * @throws MethodException    if there's a method-related issue.
+     * @throws ConditionException if there's a condition-related issue.
+     * @throws ModelException     if there's a model-related issue.
+     */
     private void validateMethodBody() throws ScopeException, VariableException, MethodException, ConditionException, ModelException {
         int i = methodStartIndex + 1; // Start after method declaration line
 
@@ -303,7 +330,7 @@ public class MethodScope extends Scope {
     }
 
     private void validateReturnStatement() throws MethodException {
-        if (lastStatementLine == -1) {
+        if (lastStatementLine == NO_STATEMENT) {
             throw new MethodException("Method must contain at least one statement", startLine);
         }
 
@@ -325,4 +352,3 @@ public class MethodScope extends Scope {
         }
     }
 }
-

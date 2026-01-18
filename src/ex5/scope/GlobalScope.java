@@ -21,6 +21,9 @@ public class GlobalScope extends Scope {
         super(null, 1, allLines);
     }
 
+    /**
+     * Execute validation over the entire file: register globals and then validate method bodies.
+     */
     @Override
     public void validate() throws ScopeException, VariableException, MethodException, ConditionException, ModelException {
         // Pass 1: Register methods and global variables
@@ -209,8 +212,13 @@ public class GlobalScope extends Scope {
         throw new ScopeException("Unclosed method body", startLine);
     }
 
+    /**
+     * Return the list of processed lines for the entire file.
+     * This is provided as a convenience and delegates to the shared lines held by the global scope.
+     *
+     * @return list of ProcessedLine representing the preprocessed file contents with original line numbers
+     */
     public List<ProcessedLine> getAllLines() {
         return allLines;
     }
 }
-

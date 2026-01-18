@@ -1,9 +1,13 @@
 package ex5.main;
 
+import ex5.models.ReturnCodes;
+
 /**
  * Base exception for s-Java validation with line-aware messaging.
  */
 public class SJavaException extends Exception {
+    public static final int NO_LINE = -1;
+
     private final int lineNumber;
 
     public SJavaException(String message, int lineNumber) {
@@ -16,7 +20,7 @@ public class SJavaException extends Exception {
     }
 
     public String getFormattedMessage() {
-        if (lineNumber > 0) {
+        if (lineNumber != NO_LINE) {
             return "Error at line " + lineNumber + ": " + getMessage();
         }
         return getMessage();
@@ -24,10 +28,9 @@ public class SJavaException extends Exception {
 
     /**
      * Returns the appropriate exit code for this exception.
-     * Default is 1 (syntax error). Override in subclasses for different behavior.
+     * Default is SYNTAX_ERROR. Override in subclasses for different behavior.
      */
     public int getExitCode() {
-        return 1;
+        return ReturnCodes.SYNTAX_ERROR;
     }
 }
-
