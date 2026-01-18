@@ -15,7 +15,8 @@ public class MethodScope extends Scope {
     private final Method methodDefinition;
     private final int methodStartIndex; // Index of method declaration line
     private final int methodEndIndex; // Index of closing brace
-    private int lastStatementLine = -1; // Track last actual statement line
+    private static final int NO_STATEMENT = -1;
+    private int lastStatementLine = NO_STATEMENT; // Track last actual statement line
 
     // Per-method table that holds copies of global variables that were UNINITIALIZED in global scope
     private final VariableTable methodGlobalInits = new VariableTable();
@@ -329,7 +330,7 @@ public class MethodScope extends Scope {
     }
 
     private void validateReturnStatement() throws MethodException {
-        if (lastStatementLine == -1) {
+        if (lastStatementLine == NO_STATEMENT) {
             throw new MethodException("Method must contain at least one statement", startLine);
         }
 

@@ -1,6 +1,7 @@
 package ex5.main;
 
 import ex5.models.ModelException;
+import ex5.models.ReturnCodes;
 import ex5.parser.CodeParser;
 import ex5.parser.ParserException;
 import ex5.preprocessor.PreprocessorException;
@@ -38,7 +39,7 @@ public class Sjavac {
             parser.parse(filePath);
 
             // Success
-            System.out.println(0);
+            System.out.println(ReturnCodes.VALID);
         } catch (InvalidFileException | ModelException | PreprocessorException | ParserException |
                  ScopeException | ConditionException | VariableException | MethodException e) {
             // we use polymorphism so we could have just used SJavaException here, but the demand was to
@@ -51,7 +52,7 @@ public class Sjavac {
         }
         catch (Exception e) {
             // Unexpected non-SJava exceptions
-            System.out.println(2);
+            System.out.println(ReturnCodes.OTHER_ERROR);
             System.err.println("Unexpected Error: " + e.getClass().getName() + ": " + e.getMessage());
         }
     }

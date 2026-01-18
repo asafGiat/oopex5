@@ -1,16 +1,18 @@
 package ex5.main;
 
+import ex5.models.ReturnCodes;
+
 /**
  * Represents invalid file usage or IO errors at program entry.
- * Exit code for this exception is 2.
+ * Exit code for this exception is OTHER_ERROR.
  */
 public class InvalidFileException extends SJavaException {
     public InvalidFileException(String message) {
-        super(message, -1);
+        super(message, NO_LINE);
     }
 
     @Override
     public int getExitCode() {
-        return 2;
+        return ReturnCodes.OTHER_ERROR;
     }
 }
