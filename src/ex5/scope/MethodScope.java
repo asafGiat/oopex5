@@ -1,6 +1,7 @@
 package ex5.scope;
 
 import ex5.models.Method;
+import ex5.models.ModelException;
 import ex5.models.ProcessedLine;
 import ex5.models.Variable;
 import ex5.validator.*;
@@ -29,7 +30,7 @@ public class MethodScope extends Scope {
     }
 
     @Override
-    public void validate() throws ScopeException, VariableException, MethodException, ConditionException {
+    public void validate() throws ScopeException, VariableException, MethodException, ConditionException, ModelException {
         // Step 1: Add parameters to variable table (already validated in GlobalScope)
         for (Variable param : methodDefinition.getParameters()) {
             addVariable(param);
@@ -42,7 +43,8 @@ public class MethodScope extends Scope {
         validateReturnStatement();
     }
 
-    private void validateMethodBody() throws ScopeException, VariableException, MethodException, ConditionException {
+    private void validateMethodBody() throws ScopeException, VariableException, MethodException, ConditionException,
+            ModelException {
         int i = methodStartIndex + 1; // Start after method declaration line
 
         while (i <= methodEndIndex) {
@@ -65,7 +67,7 @@ public class MethodScope extends Scope {
      * Shared logic for statement validation in methods and blocks.
      */
     private int processStatement(String content, int lineNumber, int currentIndex)
-            throws ScopeException, VariableException, MethodException, ConditionException {
+            throws ScopeException, VariableException, MethodException, ConditionException, ModelException {
 
         // Variable declaration
         Matcher varDeclMatcher = RegexManager.getMatcher(content, RegexManager.VARIABLE_DECLARATION);
@@ -121,7 +123,7 @@ public class MethodScope extends Scope {
     }
 
     private void parseAndAddVariableDeclaration(String line, int lineNumber)
-            throws VariableException {
+            throws VariableException, ModelException {
         boolean isFinal = line.startsWith("final ");
         String withoutFinal = isFinal ? line.substring("final ".length()).trim() : line;
 
@@ -216,7 +218,7 @@ public class MethodScope extends Scope {
     }
 
     private int createAndValidateBlock(String blockType, String condition, int lineNumber, int currentIndex)
-            throws ScopeException, VariableException, MethodException, ConditionException {
+            throws ScopeException, VariableException, MethodException, ConditionException, ModelException {
         // Validate condition
         ControlFlowValidator.validateCondition(condition, this, lineNumber);
 

@@ -10,10 +10,10 @@ import java.util.Map;
 public class VariableTable {
     private final Map<String, Variable> variables = new HashMap<>();
 
-    public void addVariable(Variable variable) {
+    public void addVariable(Variable variable) throws ModelException {
         String name = variable.getName();
         if (variables.containsKey(name)) {
-            throw new IllegalArgumentException("Variable already declared in this scope: " + name);
+            throw new ModelException("Variable already declared in this scope: " + name, variable.getLineNumber());
         }
         variables.put(name, variable);
     }
