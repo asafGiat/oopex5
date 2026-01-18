@@ -4,14 +4,20 @@ asaf.giat,rlvizen
 TWO MAIN REGULAR EXPRESSIONS
 
 1. Variable Declaration Regex
-   (final\s+)?(int|double|boolean|char|String)\s+([a-zA-Z][a-zA-Z0-9_]*|_[a-zA-Z0-9][a-zA-Z0-9_]*)(\s*=\s*([^,;]+))?(\s*,\s*([a-zA-Z][a-zA-Z0-9_]*|_[a-zA-Z0-9][a-zA-Z0-9_]*)(\s*=\s*([^,;]+))?)*\s*;
+   (final\s+)?(int|double|boolean|char|String)\s+([a-zA-Z][a-zA-Z0-9_]*|_[a-zA-Z0-9][a-zA-Z0-9_]*)
+        (\s*=\s*([^,;]+))?(\s*,\s*([a-zA-Z][a-zA-Z0-9_]*|_[a-zA-Z0-9][a-zA-Z0-9_]*)(\s*=\s*([^,;]+))?)*\s*;
 
    Capture Groups:
-   - Group 1: Final modifier (optional "final" keyword with whitespace)
-   - Group 2: Type (int, double, boolean, char, or String)
-   - Group 3: First identifier (variable name)
-   - Group 4: Optional initialization value (everything after =)
-   - Groups 5-8: Comma-separated additional variables with optional initialization
+  - Group 1: Final modifier (optional `"final"` plus trailing whitespace)
+  - Group 2: Type (`int`, `double`, `boolean`, `char`, or `String`)
+  - Group 3: First identifier (first variable name)
+  - Group 4: First variable's optional assignment fragment (the whole `= value` part, optional)
+  - Group 5: First variable's assignment value (inner capture inside group 4)
+  - Group 6: Repeated comma\+variable group (outer repeated group; when repeated it only captures the last repetition)
+  - Group 7: Last repeated variable's name (from the repeated group; only last repetition visible)
+  - Group 8: Last repeated variable's optional assignment fragment (whole `= value`, optional, from the repeated group)
+  - Group 9: Last repeated variable's assignment value (inner capture inside group 8)
+
 
 2. Method Declaration and Call Regex
    Declaration: void\s+([a-zA-Z][a-zA-Z0-9_]*)\s*\((.*?)\)\s*\{
@@ -24,6 +30,8 @@ TWO MAIN REGULAR EXPRESSIONS
    - Method name (starting with letter)
    - Arguments in parentheses
    - Terminating semicolon
+
+   * we didn't include the RegEx for the parameters and arguments here for brevity/
 
 DESIGN CHOICES
 

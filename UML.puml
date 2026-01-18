@@ -13,22 +13,22 @@ package "ex5.main" {
     -lineNumber : int
     +getFormattedMessage() : String
   }
-  class InvalidFileException extends SJavaException
-  class SyntaxException extends SJavaException
+  class InvalidFileException
+  class SyntaxException
 }
 
 package "ex5.preprocessor" {
   class CodePreprocessor {
     +{static} preprocess(String) : List<ProcessedLine>
   }
-  class PreprocessorException extends SyntaxException
+  class PreprocessorException
 }
 
 package "ex5.parser" {
   class CodeParser {
     +{static} parse(String) : GlobalScope
   }
-  class ParserException extends SyntaxException
+  class ParserException
 }
 
 package "ex5.models" {
@@ -72,10 +72,11 @@ package "ex5.models" {
     WHILE_BLOCK
     RETURN
     --
-    -type : StatementType
+    -type : Statement
     -lineNumber : int
     -content : String
   }
+  class ModelException
 }
 
 package "ex5.scope" {
@@ -113,7 +114,7 @@ package "ex5.scope" {
     -blockEndLine : int
     +validate(List<ProcessedLine>, int, int) : void
   }
-  class ScopeException extends SyntaxException
+  class ScopeException
 }
 
 package "ex5.validator" {
@@ -143,29 +144,27 @@ package "ex5.validator" {
     +{static} validateConditionVariables(String, Scope) : void
     +{static} validateOperators(String) : void
   }
-  class VariableException extends SyntaxException
-  class MethodException extends SyntaxException
-  class ConditionException extends SyntaxException
+  class VariableException
+  class MethodException
+  class ConditionException
 }
 
-Sjavac --> CodeParser : parse()
-CodeParser --> CodePreprocessor : preprocess()
-CodeParser --> GlobalScope : validate()
-GlobalScope --> MethodScope : owns
-MethodScope --> BlockScope : owns
+Sjavac ..> CodeParser
+CodeParser ..> CodePreprocessor
+CodeParser ..> GlobalScope
+GlobalScope ..> MethodScope
+MethodScope ..> BlockScope
 Scope *-- VariableTable
-Scope o-- Scope : parent/child
-Scope --> Method : uses registry
-CodePreprocessor --> ProcessedLine : returns
-MethodScope --> Method : methodDefinition
-VariableTable --> Variable
-Method --> Variable : parameters
+Scope ..> Scope
+Scope ..> Method
+CodePreprocessor ..> ProcessedLine
+MethodScope *-- Method
+VariableTable *-- Variable
+Method *-- Variable
 MethodValidator ..> Scope
 VariableValidator ..> Scope
 ControlFlowValidator ..> Scope
-Scope <|-- GlobalScope
-Scope <|-- MethodScope
-Scope <|-- BlockScope
+scope ..> Statement
 SJavaException <|-- InvalidFileException
 SJavaException <|-- SyntaxException
 SyntaxException <|-- PreprocessorException
@@ -174,11 +173,8 @@ SyntaxException <|-- ScopeException
 SyntaxException <|-- VariableException
 SyntaxException <|-- MethodException
 SyntaxException <|-- ConditionException
+SyntaxException <|-- ModelException
 
-note bottom
-Data flow: Sjavac -> CodeParser -> CodePreprocessor -> GlobalScope.validate()
-  -> MethodScope.validate() -> BlockScope.validate()
-end note
 
 @enduml
 
