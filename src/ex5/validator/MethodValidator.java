@@ -45,7 +45,8 @@ public final class MethodValidator {
      * @throws MethodException   when method is not declared or argument types/count do not match
      * @throws VariableException when an argument refers to a missing or uninitialized variable
      */
-    public static void validateMethodCall(String methodName, List<String> argStrings, Scope scope, int lineNumber)
+    public static void validateMethodCall(String methodName, List<String> argStrings, Scope scope,
+                                          int lineNumber)
             throws MethodException, VariableException {
         Method method = Scope.getMethod(methodName);
         if (method == null) {
@@ -69,7 +70,8 @@ public final class MethodValidator {
         }
     }
 
-    private static String inferType(String value, Scope scope, int lineNumber) throws MethodException, VariableException {
+    private static String inferType(String value, Scope scope, int lineNumber) throws MethodException,
+            VariableException {
         if (RegexManager.INT_VALUE.matcher(value).matches()) {
             return "int";
         }
@@ -126,7 +128,8 @@ public final class MethodValidator {
      * @throws MethodException   on malformed parameter list syntax or missing types/names
      * @throws VariableException on invalid parameter names
      */
-    public static List<Variable> parseParameterList(String paramsContent, int lineNumber) throws MethodException, VariableException {
+    public static List<Variable> parseParameterList(String paramsContent, int lineNumber)
+            throws MethodException, VariableException {
         List<Variable> params = new ArrayList<>();
         if (paramsContent == null || paramsContent.isBlank()) {
             return params;

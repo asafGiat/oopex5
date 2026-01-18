@@ -45,7 +45,8 @@ public class MethodScope extends Scope {
      * 3. Validates method body and return statement.
      */
     @Override
-    public void validate() throws ScopeException, VariableException, MethodException, ConditionException, ModelException {
+    public void validate() throws ScopeException, VariableException, MethodException, ConditionException,
+            ModelException {
         // Step 1: Add parameters to variable table (already validated in GlobalScope)
         for (Variable param : methodDefinition.getParameters()) {
             addVariable(param);
@@ -99,7 +100,8 @@ public class MethodScope extends Scope {
         // Copy uninitialized globals that are not shadowed by a parameter/local in this method
         for (Variable g : root.getVariables().getAllVariables()) {
             if (!g.isInitialized() && !this.variables.containsVariable(g.getName())) {
-                Variable copy = new Variable(g.getName(), g.getType(), g.isFinal(), false, false, g.getLineNumber());
+                Variable copy = new Variable(g.getName(), g.getType(), g.isFinal(), false,
+                        false, g.getLineNumber());
                 try {
                     this.methodGlobalInits.addVariable(copy);
                 } catch (ModelException ignored) {
@@ -112,7 +114,8 @@ public class MethodScope extends Scope {
     /**
      * Validate the method body:
      * - Processes each line from the start of the method to the closing brace.
-     * - Supports variable declarations, assignments, method calls, return statements, and control flow blocks (if/while).
+     * - Supports variable declarations, assignments, method calls, return statements, and control
+     * flow blocks (if/while).
      *
      * @throws ScopeException     if there's an invalid statement.
      * @throws VariableException  if there's a variable-related issue.
@@ -120,7 +123,8 @@ public class MethodScope extends Scope {
      * @throws ConditionException if there's a condition-related issue.
      * @throws ModelException     if there's a model-related issue.
      */
-    private void validateMethodBody() throws ScopeException, VariableException, MethodException, ConditionException, ModelException {
+    private void validateMethodBody() throws ScopeException, VariableException, MethodException,
+            ConditionException, ModelException {
         int i = methodStartIndex + 1; // Start after method declaration line
 
         while (i <= methodEndIndex) {
@@ -232,14 +236,16 @@ public class MethodScope extends Scope {
                 VariableValidator.validateVariableName(varName, lineNumber);
                 VariableValidator.validateValue(value, type, this, lineNumber);
 
-                Variable variable = new Variable(varName, type, isFinal, true, false, lineNumber);
+                Variable variable = new Variable(varName, type, isFinal, true, false,
+                        lineNumber);
                 addVariable(variable);
             } else {
                 varName = trimmed;
                 VariableValidator.validateVariableName(varName, lineNumber);
                 VariableValidator.validateDeclarationInitialization(isFinal, false, lineNumber);
 
-                Variable variable = new Variable(varName, type, isFinal, false, false, lineNumber);
+                Variable variable = new Variable(varName, type, isFinal, false, false,
+                        lineNumber);
                 addVariable(variable);
             }
         }

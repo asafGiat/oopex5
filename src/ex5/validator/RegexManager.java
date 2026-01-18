@@ -24,7 +24,8 @@ public final class RegexManager {
     /** Pattern that matches valid s-Java types (int, double, boolean, char, String) */
     public static final Pattern TYPE_PATTERN = Pattern.compile("(int|double|boolean|char|String)");
     /** Pattern matching valid variable identifiers in the simplified language */
-    public static final Pattern VARIABLE_NAME = Pattern.compile("([a-zA-Z][a-zA-Z0-9_]*|_[a-zA-Z0-9][a-zA-Z0-9_]*)");
+    public static final Pattern VARIABLE_NAME = Pattern.compile(
+            "([a-zA-Z][a-zA-Z0-9_]*|_[a-zA-Z0-9][a-zA-Z0-9_]*)");
     /** Pattern matching valid method names (same rules as identifiers) */
     public static final Pattern METHOD_NAME = Pattern.compile("[a-zA-Z][a-zA-Z0-9_]*");
 
@@ -32,7 +33,8 @@ public final class RegexManager {
     /** Pattern that matches integer literals */
     public static final Pattern INT_VALUE = Pattern.compile("[+-]?\\d+");
     /** Pattern that matches floating point literals */
-    public static final Pattern DOUBLE_VALUE = Pattern.compile("[+-]?(?:\\d+\\.\\d*|\\d*\\.\\d+|\\d+\\.|\\.\\d+)");
+    public static final Pattern DOUBLE_VALUE = Pattern.compile(
+            "[+-]?(?:\\d+\\.\\d*|\\d*\\.\\d+|\\d+\\.|\\.\\d+)");
     /** Pattern that matches boolean literal tokens (true/false) */
     public static final Pattern BOOLEAN_VALUE = Pattern.compile("true|false");
     /** Pattern that matches a single quoted char literal (simple form) */
@@ -41,22 +43,29 @@ public final class RegexManager {
     public static final Pattern STRING_VALUE = Pattern.compile("\"[^\"\\\\]*\"");
 
     // Combined value pattern: literal or identifier
-    /** Pattern that matches any value token: literal or variable name. Kept for completeness though not used elsewhere. */
-    public static final Pattern VALUE = Pattern.compile("(" + INT_VALUE + ")|(" + DOUBLE_VALUE + ")|(" + BOOLEAN_VALUE + ")|(" + CHAR_VALUE + ")|(" + STRING_VALUE + ")|(" + VARIABLE_NAME + ")");
+    /** Pattern that matches any value token: literal or variable name. Kept
+     * for completeness though not used elsewhere. */
+    public static final Pattern VALUE = Pattern.compile(
+            "(" + INT_VALUE + ")|(" + DOUBLE_VALUE + ")|(" + BOOLEAN_VALUE + ")|" +
+                    "(" + CHAR_VALUE + ")|(" + STRING_VALUE + ")|(" + VARIABLE_NAME + ")");
 
     // Statement patterns
     /** Pattern for variable declarations (may include multiple comma-separated declarations) */
     public static final Pattern VARIABLE_DECLARATION = Pattern.compile(
-            "(?:final\\s+)?" + TYPE_PATTERN + "\\s+" + VARIABLE_NAME + "(?:\\s*=\\s*[^,;]+)?(?:\\s*,\\s*" + VARIABLE_NAME + "(?:\\s*=\\s*[^,;]+)?)*\\s*;"
+            "(?:final\\s+)?" + TYPE_PATTERN + "\\s+" + VARIABLE_NAME +
+                    "(?:\\s*=\\s*[^,;]+)?(?:\\s*,\\s*" + VARIABLE_NAME +
+                    "(?:\\s*=\\s*[^,;]+)?)*\\s*;"
     );
     /** Pattern for variable assignment statements (supports multiple comma-separated assignments) */
     public static final Pattern VARIABLE_ASSIGNMENT = Pattern.compile(
             VARIABLE_NAME + "\\s*=\\s*[^,;]+(?:\\s*,\\s*" + VARIABLE_NAME + "\\s*=\\s*[^,;]+)*\\s*;"
     );
     /** Pattern for method declarations: void name(params) { */
-    public static final Pattern METHOD_DECLARATION = Pattern.compile("void\\s+" + METHOD_NAME + "\\s*\\(([^)]*)\\)\\s*\\{");
+    public static final Pattern METHOD_DECLARATION = Pattern.compile("void\\s+" +
+            METHOD_NAME + "\\s*\\(([^)]*)\\)\\s*\\{");
     /** Pattern for a method call followed by semicolon */
-    public static final Pattern METHOD_CALL = Pattern.compile(METHOD_NAME + "\\s*\\(([^)]*)\\)\\s*;");
+    public static final Pattern METHOD_CALL = Pattern.compile(METHOD_NAME +
+            "\\s*\\(([^)]*)\\)\\s*;");
     /** Pattern for if statements with condition and opening brace */
     public static final Pattern IF_STATEMENT = Pattern.compile("if\\s*\\((.+)\\)\\s*\\{");
     /** Pattern for while statements with condition and opening brace */

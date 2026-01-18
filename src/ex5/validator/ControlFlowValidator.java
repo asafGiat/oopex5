@@ -34,7 +34,8 @@ public final class ControlFlowValidator {
                     throw new ConditionException("Variable not declared in condition: " + token, lineNumber);
                 }
                 if (!variable.isInitialized()) {
-                    throw new VariableException("Variable not initialized in condition: " + token, lineNumber);
+                    throw new VariableException("Variable not initialized in condition: " + token,
+                            lineNumber);
                 }
                 String type = variable.getType();
                 if (!(type.equals("boolean") || type.equals("int") || type.equals("double"))) {

@@ -184,6 +184,7 @@ public abstract class Scope {
      * @throws ConditionException when condition expressions are invalid
      * @throws ModelException     when model-level errors occur (e.g. duplicate declarations)
      */
-    public abstract void validate() throws ScopeException, VariableException, MethodException, ConditionException, ModelException;
+    public abstract void validate() throws ScopeException, VariableException, MethodException,
+            ConditionException, ModelException;
 }
 

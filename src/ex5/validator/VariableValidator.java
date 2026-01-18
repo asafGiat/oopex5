@@ -22,7 +22,8 @@ public final class VariableValidator {
             throw new VariableException("Invalid variable name: " + name, lineNumber);
         }
         if (name.startsWith("__")) {
-            throw new VariableException("Variable name cannot start with double underscore: " + name, lineNumber);
+            throw new VariableException("Variable name cannot start with double underscore: " + name,
+                    lineNumber);
         }
         if ("_".equals(name)) {
             throw new VariableException("Variable name cannot be a single underscore", lineNumber);
@@ -39,9 +40,11 @@ public final class VariableValidator {
      *
      * @param value        the value string (literal or variable name)
      * @param expectedType the expected target type (e.g. "int", "double", "String")
-     * @param scope        scope used to resolve variable identifiers (may be null when only literals are expected)
+     * @param scope        scope used to resolve variable identifiers (may be null when only literals are
+     *                    expected)
      * @param lineNumber   original source line number for error reporting
-     * @throws VariableException when the value is invalid, the variable is missing/uninitialized, or types mismatch
+     * @throws VariableException when the value is invalid, the variable is missing/uninitialized, or types
+     * mismatch
      */
     public static void validateValue(String value, String expectedType, Scope scope, int lineNumber)
             throws VariableException {
@@ -69,7 +72,8 @@ public final class VariableValidator {
     }
 
     /**
-     * Validate that an assignment target may be assigned to (e.g. not reassigning an already-initialized final).
+     * Validate that an assignment target may be assigned to (e.g. not reassigning an already-initialized
+     * final).
      *
      * @param variable   the target variable
      * @param lineNumber original source line number for error reporting
@@ -89,7 +93,8 @@ public final class VariableValidator {
      * @param lineNumber     original source line number for error reporting
      * @throws VariableException when a final variable is declared without initialization
      */
-    public static void validateDeclarationInitialization(boolean isFinal, boolean hasInitialization, int lineNumber)
+    public static void validateDeclarationInitialization(boolean isFinal, boolean hasInitialization,
+                                                         int lineNumber)
             throws VariableException {
         if (isFinal && !hasInitialization) {
             throw new VariableException("Final variable must be initialized at declaration", lineNumber);

@@ -25,7 +25,8 @@ public class GlobalScope extends Scope {
      * Execute validation over the entire file: register globals and then validate method bodies.
      */
     @Override
-    public void validate() throws ScopeException, VariableException, MethodException, ConditionException, ModelException {
+    public void validate() throws ScopeException, VariableException, MethodException, ConditionException,
+            ModelException {
         // Pass 1: Register methods and global variables
         firstPass();
 
@@ -84,7 +85,8 @@ public class GlobalScope extends Scope {
         }
     }
 
-    private void secondPass() throws MethodException, VariableException, ScopeException, ConditionException, ModelException {
+    private void secondPass() throws MethodException, VariableException, ScopeException, ConditionException,
+            ModelException {
         // Validate each registered method's body
         for (int i = 0; i < allLines.size(); i++) {
             ProcessedLine line = allLines.get(i);
@@ -136,14 +138,16 @@ public class GlobalScope extends Scope {
                 VariableValidator.validateVariableName(varName, lineNumber);
                 VariableValidator.validateValue(value, type, this, lineNumber);
 
-                Variable variable = new Variable(varName, type, isFinal, true, false, lineNumber);
+                Variable variable = new Variable(varName, type, isFinal, true, false,
+                        lineNumber);
                 addVariable(variable);
             } else {
                 varName = trimmed;
                 VariableValidator.validateVariableName(varName, lineNumber);
                 VariableValidator.validateDeclarationInitialization(isFinal, false, lineNumber);
 
-                Variable variable = new Variable(varName, type, isFinal, false, false, lineNumber);
+                Variable variable = new Variable(varName, type, isFinal, false, false,
+                        lineNumber);
                 addVariable(variable);
             }
         }

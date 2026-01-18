@@ -36,11 +36,13 @@ public class BlockScope extends Scope {
     }
 
     @Override
-    public void validate() throws ScopeException, VariableException, MethodException, ConditionException, ModelException {
+    public void validate() throws ScopeException, VariableException, MethodException, ConditionException,
+            ModelException {
         validateBlockBody();
     }
 
-    private void validateBlockBody() throws ScopeException, VariableException, MethodException, ConditionException, ModelException {
+    private void validateBlockBody() throws ScopeException, VariableException, MethodException,
+            ConditionException, ModelException {
         int i = blockStartIndex + 1; // Start after if/while statement line
 
         while (i <= blockEndIndex) {
@@ -95,7 +97,8 @@ public class BlockScope extends Scope {
         Matcher ifMatcher = RegexManager.getMatcher(content, RegexManager.IF_STATEMENT);
         if (ifMatcher.matches()) {
             String nestedCondition = ifMatcher.group(1);
-            int blockEnd = createAndValidateBlock("if", nestedCondition, lineNumber, currentIndex);
+            int blockEnd = createAndValidateBlock("if", nestedCondition, lineNumber,
+                    currentIndex);
             return blockEnd + 1;
         }
 
@@ -103,7 +106,8 @@ public class BlockScope extends Scope {
         Matcher whileMatcher = RegexManager.getMatcher(content, RegexManager.WHILE_STATEMENT);
         if (whileMatcher.matches()) {
             String nestedCondition = whileMatcher.group(1);
-            int blockEnd = createAndValidateBlock("while", nestedCondition, lineNumber, currentIndex);
+            int blockEnd = createAndValidateBlock("while", nestedCondition, lineNumber,
+                    currentIndex);
             return blockEnd + 1;
         }
 
@@ -145,14 +149,16 @@ public class BlockScope extends Scope {
                 VariableValidator.validateVariableName(varName, lineNumber);
                 VariableValidator.validateValue(value, type, this, lineNumber);
 
-                Variable variable = new Variable(varName, type, isFinal, true, false, lineNumber);
+                Variable variable = new Variable(varName, type, isFinal, true, false,
+                        lineNumber);
                 addVariable(variable);
             } else {
                 varName = trimmed;
                 VariableValidator.validateVariableName(varName, lineNumber);
                 VariableValidator.validateDeclarationInitialization(isFinal, false, lineNumber);
 
-                Variable variable = new Variable(varName, type, isFinal, false, false, lineNumber);
+                Variable variable = new Variable(varName, type, isFinal, false, false,
+                        lineNumber);
                 addVariable(variable);
             }
         }
@@ -206,7 +212,8 @@ public class BlockScope extends Scope {
         MethodValidator.validateMethodCall(methodName, args, this, lineNumber);
     }
 
-    private int createAndValidateBlock(String nestedBlockType, String nestedCondition, int lineNumber, int currentIndex)
+    private int createAndValidateBlock(String nestedBlockType, String nestedCondition, int lineNumber,
+                                       int currentIndex)
             throws ScopeException, VariableException, MethodException, ConditionException, ModelException {
         // Validate condition
         ControlFlowValidator.validateCondition(nestedCondition, this, lineNumber);
@@ -215,7 +222,9 @@ public class BlockScope extends Scope {
         int blockEnd = findBlockEnd(currentIndex, lineNumber);
 
         // Create and validate block scope
-        BlockScope blockScope = new BlockScope(this, nestedBlockType, nestedCondition, currentIndex, blockEnd);
+        BlockScope blockScope = new BlockScope(this, nestedBlockType, nestedCondition,
+                currentIndex,
+                blockEnd);
         addChildScope(blockScope);
         blockScope.validate();
 

@@ -20,7 +20,8 @@ public class VariableTable {
     public void addVariable(Variable variable) throws ModelException {
         String name = variable.getName();
         if (variables.containsKey(name)) {
-            throw new ModelException("Variable already declared in this scope: " + name, variable.getLineNumber());
+            throw new ModelException("Variable already declared in this scope: " + name,
+                    variable.getLineNumber());
         }
         variables.put(name, variable);
     }
