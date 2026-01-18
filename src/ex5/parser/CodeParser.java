@@ -1,5 +1,6 @@
 package ex5.parser;
 
+import ex5.models.ModelException;
 import ex5.models.ProcessedLine;
 import ex5.preprocessor.CodePreprocessor;
 import ex5.preprocessor.PreprocessorException;
@@ -21,7 +22,7 @@ public class CodeParser {
      * @throws PreprocessorException when file IO errors occur
      * @throws SyntaxException when syntax errors occur during validation
      */
-    public GlobalScope parse(String filePath) throws PreprocessorException, SyntaxException {
+    public GlobalScope parse(String filePath) throws PreprocessorException, SyntaxException, ModelException {
         CodePreprocessor preprocessor = new CodePreprocessor();
         List<ProcessedLine> lines = preprocessor.preprocess(filePath);
 

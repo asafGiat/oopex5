@@ -49,9 +49,9 @@ public class Variable {
         this.isInitialized = true;
     }
 
-    public void assertCanAssign() {
+    public void assertCanAssign() throws ModelException {
         if (isFinal && isInitialized) {
-            throw new IllegalStateException("Cannot reassign a final variable: " + name);
+            throw new ModelException("Cannot reassign a final variable: " + name, this.lineNumber);
         }
     }
 }

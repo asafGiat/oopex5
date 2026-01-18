@@ -1,5 +1,6 @@
 package ex5.scope;
 
+import ex5.models.ModelException;
 import ex5.models.ProcessedLine;
 import ex5.models.Variable;
 import ex5.validator.*;
@@ -35,11 +36,11 @@ public class BlockScope extends Scope {
     }
 
     @Override
-    public void validate() throws ScopeException, VariableException, MethodException, ConditionException {
+    public void validate() throws ScopeException, VariableException, MethodException, ConditionException, ModelException {
         validateBlockBody();
     }
 
-    private void validateBlockBody() throws ScopeException, VariableException, MethodException, ConditionException {
+    private void validateBlockBody() throws ScopeException, VariableException, MethodException, ConditionException, ModelException {
         int i = blockStartIndex + 1; // Start after if/while statement line
 
         while (i <= blockEndIndex) {
@@ -61,7 +62,7 @@ public class BlockScope extends Scope {
      * Process a single statement and return the next index to continue from.
      */
     private int processStatement(String content, int lineNumber, int currentIndex)
-            throws ScopeException, VariableException, MethodException, ConditionException {
+            throws ScopeException, VariableException, MethodException, ConditionException, ModelException {
 
         // Variable declaration
         Matcher varDeclMatcher = RegexManager.getMatcher(content, RegexManager.VARIABLE_DECLARATION);
@@ -111,7 +112,7 @@ public class BlockScope extends Scope {
     }
 
     private void parseAndAddVariableDeclaration(String line, int lineNumber)
-            throws VariableException {
+            throws VariableException, ModelException {
         boolean isFinal = line.startsWith("final ");
         String withoutFinal = isFinal ? line.substring("final ".length()).trim() : line;
 
@@ -206,7 +207,7 @@ public class BlockScope extends Scope {
     }
 
     private int createAndValidateBlock(String nestedBlockType, String nestedCondition, int lineNumber, int currentIndex)
-            throws ScopeException, VariableException, MethodException, ConditionException {
+            throws ScopeException, VariableException, MethodException, ConditionException, ModelException {
         // Validate condition
         ControlFlowValidator.validateCondition(nestedCondition, this, lineNumber);
 

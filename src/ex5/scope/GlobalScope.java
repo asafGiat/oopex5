@@ -1,6 +1,7 @@
 package ex5.scope;
 
 import ex5.models.Method;
+import ex5.models.ModelException;
 import ex5.models.ProcessedLine;
 import ex5.models.Variable;
 import ex5.validator.*;
@@ -21,7 +22,7 @@ public class GlobalScope extends Scope {
     }
 
     @Override
-    public void validate() throws ScopeException, VariableException, MethodException, ConditionException {
+    public void validate() throws ScopeException, VariableException, MethodException, ConditionException, ModelException {
         // Pass 1: Register methods and global variables
         firstPass();
 
@@ -29,7 +30,7 @@ public class GlobalScope extends Scope {
         secondPass();
     }
 
-    private void firstPass() throws ScopeException, VariableException, MethodException {
+    private void firstPass() throws ScopeException, VariableException, MethodException, ModelException {
         int i = 0;
         while (i < allLines.size()) {
             ProcessedLine line = allLines.get(i);
@@ -80,7 +81,7 @@ public class GlobalScope extends Scope {
         }
     }
 
-    private void secondPass() throws MethodException, VariableException, ScopeException, ConditionException {
+    private void secondPass() throws MethodException, VariableException, ScopeException, ConditionException, ModelException {
         // Validate each registered method's body
         for (int i = 0; i < allLines.size(); i++) {
             ProcessedLine line = allLines.get(i);
@@ -99,7 +100,7 @@ public class GlobalScope extends Scope {
     }
 
     private void parseAndAddVariableDeclaration(String line, int lineNumber)
-            throws VariableException {
+            throws VariableException, ModelException {
         boolean isFinal = line.startsWith("final ");
         String withoutFinal = isFinal ? line.substring("final ".length()).trim() : line;
 

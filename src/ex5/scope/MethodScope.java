@@ -3,7 +3,6 @@ package ex5.scope;
 import ex5.models.Method;
 import ex5.models.ProcessedLine;
 import ex5.models.Variable;
-import ex5.models.VariableTable;
 import ex5.validator.*;
 
 import java.util.List;

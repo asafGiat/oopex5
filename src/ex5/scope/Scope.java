@@ -44,7 +44,7 @@ public abstract class Scope {
 
 
 
-    public void addVariable(Variable variable) {
+    public void addVariable(Variable variable) throws ModelException {
         variables.addVariable(variable);
     }
 
@@ -120,6 +120,6 @@ public abstract class Scope {
     /**
      * Validate this scope's content. Implementations parse and validate their relevant lines.
      */
-    public abstract void validate() throws ScopeException, VariableException, MethodException, ConditionException;
+    public abstract void validate() throws ScopeException, VariableException, MethodException, ConditionException, ModelException;
 }
 
