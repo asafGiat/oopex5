@@ -44,7 +44,12 @@ public class Sjavac {
             // we use polymorphism so we could have just used SJavaException here, but the demand was to
             // catch the concrete exception type
             handleSJavaException(e);
-        } catch (Exception e) {
+        } catch (SJavaException e){
+            // Catch any other SJavaExceptions not previously caught
+            // not expected to be here
+            handleSJavaException(e);
+        }
+        catch (Exception e) {
             // Unexpected non-SJava exceptions
             System.out.println(2);
             System.err.println("Unexpected Error: " + e.getClass().getName() + ": " + e.getMessage());

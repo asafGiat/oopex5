@@ -92,14 +92,23 @@ public final class MethodValidator {
         return args;
     }
 
-    public static List<Variable> parseParameterList(String paramsContent, int lineNumber) throws MethodException {
+    public static List<Variable> parseParameterList(String paramsContent, int lineNumber) throws MethodException, VariableException {
         List<Variable> params = new ArrayList<>();
         if (paramsContent == null || paramsContent.isBlank()) {
             return params;
         }
+        // Reject leading or trailing commas which would be silently ignored by String.split
+        String trimmedContent = paramsContent.trim();
+        if (trimmedContent.startsWith(",") || trimmedContent.endsWith(",")) {
+            throw new MethodException("Invalid parameter list: leading or trailing comma", lineNumber);
+        }
         String[] parts = paramsContent.split(",");
         for (String part : parts) {
             String trimmed = part.trim();
+            // Reject empty parameter entries (covers consecutive commas)
+            if (trimmed.isEmpty()) {
+                throw new MethodException("Empty parameter in parameter list", lineNumber);
+            }
             boolean isFinal = trimmed.startsWith("final ");
             String withoutFinal = isFinal ? trimmed.substring("final ".length()).trim() : trimmed;
 
@@ -112,10 +121,13 @@ public final class MethodValidator {
             if (name.isEmpty()) {
                 throw new MethodException("Missing parameter name in: " + trimmed, lineNumber);
             }
+
+            // Validate the parameter name (throws VariableException on invalid name)
+            VariableValidator.validateVariableName(name, lineNumber);
+
             Variable param = new Variable(name, type, isFinal, true, true, lineNumber);
             params.add(param);
         }
         return params;
     }
 }
-
