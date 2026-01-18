@@ -14,4 +14,3 @@ public class InvalidFileException extends SJavaException {
         return 2;
     }
 }
-

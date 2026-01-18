@@ -11,6 +11,7 @@ import java.util.List;
 
 /**
  * Parser entry point: preprocesses the file, constructs GlobalScope, and triggers validation.
+ * Parses preprocessed lines into models (methods, variables) and builds scopes.
  */
 public class CodeParser {
 
@@ -32,4 +33,3 @@ public class CodeParser {
         return globalScope;
     }
 }
-

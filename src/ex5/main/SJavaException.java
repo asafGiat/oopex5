@@ -30,4 +30,3 @@ public class SJavaException extends Exception {
         return 1;
     }
 }
-

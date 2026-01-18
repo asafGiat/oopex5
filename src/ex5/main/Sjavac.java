@@ -65,4 +65,3 @@ public class Sjavac {
         System.err.println(e.getFormattedMessage());
     }
 }
-
