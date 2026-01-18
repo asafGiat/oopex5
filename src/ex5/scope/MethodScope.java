@@ -3,6 +3,7 @@ package ex5.scope;
 import ex5.models.Method;
 import ex5.models.ProcessedLine;
 import ex5.models.Variable;
+import ex5.models.VariableTable;
 import ex5.validator.*;
 
 import java.util.List;
@@ -14,10 +15,12 @@ import java.util.regex.Matcher;
  */
 public class MethodScope extends Scope {
     private final Method methodDefinition;
-    //private final List<ProcessedLine> allLines;
     private final int methodStartIndex; // Index of method declaration line
     private final int methodEndIndex; // Index of closing brace
     private int lastStatementLine = -1; // Track last actual statement line
+
+    // Per-method table that holds copies of global variables that were UNINITIALIZED in global scope
+    private final VariableTable methodGlobalInits = new VariableTable();
 
     public MethodScope(Scope parentScope, Method method, int startIndex, int endIndex) {
         super(parentScope, method.getDeclarationLine());
@@ -35,11 +38,62 @@ public class MethodScope extends Scope {
             addVariable(param);
         }
 
+        // Populate per-method table with uninitialized globals (only those not shadowed by params/locals)
+        copyUninitializedGlobalsFromRoot();
+
         // Step 2: Validate method body statements
         validateMethodBody();
 
         // Step 3: Validate return statement exists and is last
         validateReturnStatement();
+    }
+
+    /**
+     * Lookup variables: check local vars/params, then per-method uninitialized-global copies,
+     * then delegate to parent scope (which will eventually find global initialized vars).
+     */
+    @Override
+    public Variable findVariable(String name) {
+        // Check locals and parameters first
+        Variable local = this.variables.getVariable(name);
+        if (local != null) {
+            return local;
+        }
+        // Then check the per-method table of globals that were uninitialized in the global scope
+        Variable methodGlobal = this.methodGlobalInits.getVariable(name);
+        if (methodGlobal != null) {
+            return methodGlobal;
+        }
+        // Fallback to parent/global
+        if (parentScope != null) {
+            return parentScope.findVariable(name);
+        }
+        return null;
+    }
+
+    /**
+     * Copy only those global variables that were not initialized at the global scope into
+     * this method's local per-method table. This allows each method to track its own initialization
+     * of previously-uninitialized globals without mutating the global Variable objects.
+     */
+    private void copyUninitializedGlobalsFromRoot() {
+        // Find root/global scope
+        Scope root = this;
+        while (root.getParentScope() != null) {
+            root = root.getParentScope();
+        }
+
+        // Copy uninitialized globals that are not shadowed by a parameter/local in this method
+        for (Variable g : root.getVariables().getAllVariables()) {
+            if (!g.isInitialized() && !this.variables.containsVariable(g.getName())) {
+                Variable copy = new Variable(g.getName(), g.getType(), g.isFinal(), false, false, g.getLineNumber());
+                try {
+                    this.methodGlobalInits.addVariable(copy);
+                } catch (IllegalArgumentException ignored) {
+                    // If already present, ignore
+                }
+            }
+        }
     }
 
     private void validateMethodBody() throws ScopeException, VariableException, MethodException, ConditionException {

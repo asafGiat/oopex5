@@ -14,7 +14,6 @@ import java.util.regex.Matcher;
 public class BlockScope extends Scope {
     private final String blockType; // "if" or "while"
     private final String condition;
-    //private final List<ProcessedLine> allLines;
     private final int blockStartIndex; // Index of if/while statement line
     private final int blockEndIndex; // Index of closing brace
 
@@ -22,7 +21,6 @@ public class BlockScope extends Scope {
         super(parentScope, parentScope.getAllLines().get(startIndex).getOriginalLineNumber());
         this.blockType = blockType;
         this.condition = condition;
-        //this.allLines = getTopLevelLines(parentScope);
         this.blockStartIndex = startIndex;
         this.blockEndIndex = endIndex;
         this.endLine = allLines.get(endIndex).getOriginalLineNumber();
