@@ -12,6 +12,7 @@ import java.util.regex.Matcher;
  * @see Scope
  */
 public class MethodScope extends Scope {
+    private static final int LIMIT = 2;
     private final Method methodDefinition;
     private final int methodStartIndex; // Index of method declaration line
     private final int methodEndIndex; // Index of closing brace
@@ -225,7 +226,7 @@ public class MethodScope extends Scope {
             boolean hasInit = trimmed.contains("=");
 
             if (hasInit) {
-                String[] parts = trimmed.split("=", 2);
+                String[] parts = trimmed.split("=", LIMIT);
                 varName = parts[0].trim();
                 String value = parts[1].trim();
 
@@ -258,9 +259,9 @@ public class MethodScope extends Scope {
 
         for (String assignment : assignments) {
             String trimmed = assignment.trim();
-            String[] parts = trimmed.split("=", 2);
+            String[] parts = trimmed.split("=", LIMIT);
 
-            if (parts.length != 2) {
+            if (parts.length != LIMIT) {
                 throw new VariableException("Invalid assignment syntax", lineNumber);
             }
 

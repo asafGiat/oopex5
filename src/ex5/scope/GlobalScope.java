@@ -17,6 +17,8 @@ import java.util.regex.Matcher;
  */
 public class GlobalScope extends Scope {
 
+    private static final int LIMIT = 2;
+
     public GlobalScope(List<ProcessedLine> allLines) {
         super(null, 1, allLines);
     }
@@ -129,7 +131,7 @@ public class GlobalScope extends Scope {
             boolean hasInit = trimmed.contains("=");
 
             if (hasInit) {
-                String[] parts = trimmed.split("=", 2);
+                String[] parts = trimmed.split("=", LIMIT);
                 varName = parts[0].trim();
                 String value = parts[1].trim();
 
@@ -162,9 +164,9 @@ public class GlobalScope extends Scope {
 
         for (String assignment : assignments) {
             String trimmed = assignment.trim();
-            String[] parts = trimmed.split("=", 2);
+            String[] parts = trimmed.split("=", LIMIT);
 
-            if (parts.length != 2) {
+            if (parts.length != LIMIT) {
                 throw new VariableException("Invalid assignment syntax", lineNumber);
             }
 
