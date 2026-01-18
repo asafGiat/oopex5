@@ -13,6 +13,7 @@ import java.util.regex.Matcher;
  * Validates statements within the block.
  */
 public class BlockScope extends Scope {
+    private static final int LIMIT = 2;
     private final String blockType; // "if" or "while"
     private final String condition;
     private final int blockStartIndex; // Index of if/while statement line
@@ -142,7 +143,7 @@ public class BlockScope extends Scope {
             boolean hasInit = trimmed.contains("=");
 
             if (hasInit) {
-                String[] parts = trimmed.split("=", 2);
+                String[] parts = trimmed.split("=", LIMIT);
                 varName = parts[0].trim();
                 String value = parts[1].trim();
 
@@ -177,9 +178,9 @@ public class BlockScope extends Scope {
 
         for (String assignment : assignments) {
             String trimmed = assignment.trim();
-            String[] parts = trimmed.split("=", 2);
+            String[] parts = trimmed.split("=", LIMIT);
 
-            if (parts.length != 2) {
+            if (parts.length != LIMIT) {
                 throw new VariableException("Invalid assignment syntax", lineNumber);
             }
 
