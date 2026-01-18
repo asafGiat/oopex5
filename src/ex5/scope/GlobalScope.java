@@ -22,7 +22,8 @@ public class GlobalScope extends Scope {
     /**
      * Construct the global scope with the full list of preprocessed lines.
      *
-     * @param allLines list of ProcessedLine representing the preprocessed file contents with original line numbers
+     * @param allLines list of ProcessedLine representing the preprocessed file contents with
+     *                original line numbers
      */
     public GlobalScope(List<ProcessedLine> allLines) {
         super(null, 1, allLines);

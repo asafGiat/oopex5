@@ -86,7 +86,8 @@ public final class VariableValidator {
     }
 
     /**
-     * Validate that declaration-time initialization rules are satisfied (final variables must be initialized).
+     * Validate that declaration-time initialization rules are satisfied
+     * (final variables must be initialized).
      *
      * @param isFinal        whether the declared variable is final
      * @param hasInitialization whether an initializer was provided
