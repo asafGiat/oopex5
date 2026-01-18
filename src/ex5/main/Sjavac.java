@@ -1,7 +1,14 @@
 package ex5.main;
 
+import ex5.models.ModelException;
 import ex5.parser.CodeParser;
-import ex5.scope.GlobalScope;
+import ex5.parser.ParserException;
+import ex5.preprocessor.PreprocessorException;
+import ex5.scope.ScopeException;
+import ex5.validator.ConditionException;
+import ex5.validator.MethodException;
+import ex5.validator.VariableException;
+
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
@@ -28,11 +35,14 @@ public class Sjavac {
 
             // Parse and validate the file
             CodeParser parser = new CodeParser();
-            GlobalScope globalScope = parser.parse(filePath);
+            parser.parse(filePath);
 
             // Success
             System.out.println(0);
-        } catch (SJavaException e) {
+        } catch (InvalidFileException | ModelException | PreprocessorException | ParserException |
+                 ScopeException | ConditionException | VariableException | MethodException e) {
+            // we use polymorphism so we could have just used SJavaException here, but the demand was to
+            // catch the concrete exception type
             handleSJavaException(e);
         } catch (Exception e) {
             // Unexpected non-SJava exceptions
