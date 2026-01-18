@@ -10,6 +10,15 @@ public final class ControlFlowValidator {
     private ControlFlowValidator() {
     }
 
+    /**
+     * Validate a condition string for if/while statements.
+     *
+     * @param condition  condition string to validate
+     * @param scope      current scope for variable lookup
+     * @param lineNumber line number of the condition for error reporting
+     * @throws ConditionException when the condition is invalid
+     * @throws VariableException  when a variable in the condition is undeclared or uninitialized
+     */
     public static void validateCondition(String condition, Scope scope, int lineNumber)
             throws ConditionException, VariableException {
         // Split by logical operators && and ||

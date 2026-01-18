@@ -12,21 +12,46 @@ import java.util.Map;
  * Base scope abstraction. Provides variable lookup chain, child linkage, and global method registry.
  */
 public abstract class Scope {
+    /**
+     *  Variable table for this scope */
     protected final VariableTable variables = new VariableTable();
+    /**
+     * Parent scope, or null for global scope
+     */
     protected final Scope parentScope;
+    /**
+     * List of child scopes nested within this scope
+     */
     protected final List<Scope> childScopes = new ArrayList<>();
+    /**
+     * List of statements parsed within this scope
+     */
     protected final List<Statement> statements = new ArrayList<>();
+    /** List of all processed lines for the file (shared from global scope) */
     protected final List<ProcessedLine> allLines;
+    /** Start line number for this scope */
     protected final int startLine;
+    /** End line number for this scope */
     protected int endLine;
 
     // Global registry of methods across the file (shared across all scopes)
     private static final Map<String, Method> globalMethods = new HashMap<>();
 
+    /** Construct a new Scope instance.
+     *
+     * @param parentScope parent scope, or null for global scope
+     * @param startLine   original source line number where this scope starts
+     */
     protected Scope(Scope parentScope, int startLine) {
         this(parentScope, startLine, null);
     }
 
+    /** Construct a new Scope instance with specified allLines list (for global scope).
+     *
+     * @param parentScope parent scope, or null for global scope
+     * @param startLine   original source line number where this scope starts
+     * @param allLines    list of all processed lines for the file (only used for global scope)
+     */
     protected Scope(Scope parentScope, int startLine, List<ProcessedLine> allLines) {
         this.parentScope = parentScope;
         this.startLine = startLine;

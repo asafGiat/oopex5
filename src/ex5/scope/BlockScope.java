@@ -19,6 +19,15 @@ public class BlockScope extends Scope {
     private final int blockStartIndex; // Index of if/while statement line
     private final int blockEndIndex; // Index of closing brace
 
+    /**
+     * Create a BlockScope for an if or while block.
+     *
+     * @param parentScope  enclosing scope
+     * @param blockType    "if" or "while"
+     * @param condition    condition expression
+     * @param startIndex   index of the if/while statement line
+     * @param endIndex     index of the closing brace line
+     */
     public BlockScope(Scope parentScope, String blockType, String condition, int startIndex, int endIndex) {
         super(parentScope, parentScope.getAllLines().get(startIndex).getOriginalLineNumber());
         this.blockType = blockType;
@@ -252,10 +261,16 @@ public class BlockScope extends Scope {
         throw new ScopeException("Unclosed block", startLine);
     }
 
+    /**
+     * @return the block type ("if" or "while")
+     * */
     public String getBlockType() {
         return blockType;
     }
 
+    /**
+     * @return the condition expression for this block
+     */
     public String getCondition() {
         return condition;
     }

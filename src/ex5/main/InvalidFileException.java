@@ -7,6 +7,11 @@ import ex5.models.ReturnCodes;
  * Exit code for this exception is OTHER_ERROR.
  */
 public class InvalidFileException extends SJavaException {
+    /**
+     * Construct an InvalidFileException with a message.
+     *
+     * @param message description of the file error
+     */
     public InvalidFileException(String message) {
         super(message, NO_LINE);
     }
