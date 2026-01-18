@@ -6,9 +6,13 @@ import ex5.models.ReturnCodes;
  * Base exception for s-Java validation with line-aware messaging.
  */
 public class SJavaException extends Exception {
-    /** Constant indicating no line number is associated with the error. */
+    /**
+     *  Constant indicating no line number is associated with the error.
+     *  */
     public static final int NO_LINE = -1;
 
+    /**
+     *  Original source line number, or NO_LINE if not applicable. */
     private final int lineNumber;
 
     /**

@@ -18,6 +18,10 @@ import java.nio.file.Paths;
  * Prints 0 (valid), 1 (syntax error), or 2 (IO/invalid usage) per requirements.
  */
 public class Sjavac {
+    /** Main method to run the s-Java verifier.
+     *
+     * @param args command-line arguments; expects a single .sjava file path
+     */
     public static void main(String[] args) {
         try {
             // Validate command-line arguments
